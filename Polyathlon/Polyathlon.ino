@@ -12,34 +12,26 @@
 // Pololu is awesome. They have great customer service, great prices,
 // and great prodoucts. Not affiliated in any way. Just a satisfied customer.
 ////////////////////////////////////////////////////////////////////////
+// This example uses
+//  - Arduino Mega 2560
+//  - NXT Motor Shield
+//  - Pololu QTR-8A IR Reflectance Sensor
+//
+////////////////////////////////////////////////////////////////////////
+// Significant re-write from previous versions
+//  - Removing long comments/explanations
+//  - Leveraging NXTShield libraries
 
-// This example uses a Pololu QTR-8A IR Reflectance Sensor and an 
-// Arduino Mega 2560
 
 // The emitter control pin can optionally be connected to digital pin 2, or you can leave
 // it disconnected and change the EMITTER_PIN #define below from 2 to QTR_NO_EMITTER_PIN.
 
-// The main loop of the example reads the calibrated sensor values and uses them to
-// estimate the position of a line.  You can test this by taping a piece of 3/4" black
-// electrical tape to a piece of white paper and sliding the sensor across it.  It
-// prints the sensor values to the serial monitor as numbers from 0 (maximum reflectance) 
-// to 9 (minimum reflectance) followed by the estimated location of the line as a number
-// from 0 to 7000.  1000 means the line is directly under sensor 1, 2000 means directly
-// under sensor 2, etc.  0 means the line is directly under sensor 0 or was last seen by
-// sensor 0 before being lost.  7000 means the line is directly under sensor 7 or was
-// last seen by sensor 7 before being lost.
-
-// Use a global #define statement to enable/disable all print statements at compile time
-// useful for turning off all Serial.print or Serial.println statements when I know the
-// bot won't be connected to a USB serial port.
-//
-//#define debugprint Serial.print
-//#define debugprintln Serial.println
-// Or to disable
-//#define debugprint //
-//#define debugprintln //
-//debugprint ("Debug message: ");
-//debugprintln ("Another debug message");
+////////////////////////////////////////////////////////////////////////
+// Prepare NXT Motor Shield libraries
+#include <Wire.h>
+#include <NXTShield.h>
+Motor1 leftMotor;
+Motor2 rightMotor;
   
 ////////////////////////////////////////////////////////////////////////
 // Prepare QTR-8A IR Reflectance Array
@@ -54,40 +46,19 @@ NUM_SENSORS, NUM_SAMPLES_PER_SENSOR, EMITTER_PIN);
 unsigned int sensorValues[NUM_SENSORS];
 
 ////////////////////////////////////////////////////////////////////////
-//
-// Now using Arduino Mega 2560 with Sparkfun Ardumoto Shield 
-//
-// NXT pins (not Arduino pins, 
-//  1 white analog, 9V supply
-//  2 black ground, 
-//  3 red   ground
-//  4 green ipowerA, supply with 5V to activate encoders (I think?)
-//  5 yelow encoder, RS-485 B
-//  6 blue  encoder, RS-485 A
-//
-// ardumoto plugged onto arduino mega 2560
-// supplying 9V power supply to Arduino Mega itself via barrel plug AND
-// supplying 9V power to ArduMoto shield via VIN +/- terminals
-// ardumoto A1 connected to NXT pin 1 AN IN
-// ardumoto A2 connected to NXT pin 2 GRND
-// ardumoto B3 connected to NXT pin 2 GRND
-// ardumoto B4 connected to NXT pin 1 AN IN
-//
-// This example does not utilize the wheel encoders built into the
-// Lego NXT servos.
- 
-// Initialize variables related to Ardumoto controlled motors
-int pwm_a = 3;  //PWM (Pulse Width Modulation) control for motor outputs 1 and 2 is on digital pin 3
-int pwm_b = 11;  //PWM control for motor outputs 3 and 4 is on digital pin 11
-int dir_a = 12;  //direction control for motor outputs 1 and 2 is on digital pin 12
-int dir_b = 13;  //direction control for motor outputs 3 and 4 is on digital pin 13
-
-// Initialize variables related to LED indicator and pushbutton
+// Prepare LEDs and pushbuttons
 // constants won't change. They're used here to set pin numbers:
 const int buttonPin = 2;     // the number of the pushbutton pin
-const int ledPin =  13;      // the number of the LED pin
+const int ledPin =  13;      // the number of the LED pin (probably need to change, 13 is popular for other things)
 // variables will change:
 int buttonState = 0;         // variable for reading the pushbutton status
+
+////////////////////////////////////////////////////////////////////////
+// Prepare PID library
+#include <PID_v1.h>
+// Initialize variables related to PID
+double PIDsetpoint, PIDinput, PIDoutput;
+PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,2,5,1, DIRECT);
 
 ////////////////////////////////////////////////////////////////////////
 // Prepare 
@@ -95,12 +66,7 @@ int buttonState = 0;         // variable for reading the pushbutton status
 void setup()
 {
   // initialize serial communication
-  Serial.begin(9600);
-  // SETUP drive motors
-  pinMode(pwm_a, OUTPUT);  //Set control pins to be outputs
-  pinMode(pwm_b, OUTPUT);
-  pinMode(dir_a, OUTPUT);
-  pinMode(dir_b, OUTPUT);
+  Serial.begin(115200);
   
   // initialize LED pin as an output
   pinMode(ledPin, OUTPUT);
@@ -108,18 +74,23 @@ void setup()
   // initialize pushbutton pin as an input:
   pinMode(buttonPin, INPUT);
   
+  // initialize PID variables we're linked to
+  PIDinput = qtra.readLine(sensorValues); // 
+  PIDsetpoint = 3500;                     // attempt to stay centered over line
+  myPID.SetMode(AUTOMATIC);               // turn the PID on
+
+  ////////////////////////////////////////////////////////////////////////
   // calibrate IR array (might move this into a function later)
   delay(500);
   int i;
   
-  for (i = 0; i < 250; i++)      // make the calibration take about 7 seconds
+  for (i = 0; i < 200; i++)      // run calibration for a few seconds
   {
     digitalWrite(ledPin, HIGH);  // turn on LED (flicker LED during calibration)
     delay(20);
     qtra.calibrate();            // reads all sensors 10 times at 2.5 ms per six sensors (i.e. ~25 ms per call)
     digitalWrite(ledPin, LOW);   // turn off LED
     delay(20);
-
   }
   digitalWrite(ledPin, LOW);     // turn off LED to indicate we are through with calibration
   // print the calibration MINimum values measured when emitters were on
@@ -138,28 +109,24 @@ void setup()
   Serial.println();
   Serial.println();
   delay(1000);
-
+  ////////////////////////////////////////////////////////////////////////
   // pause at end of setup to wait for button push
   pause(); 
-  
-}
+} //end of void setup
 
 ////////////////////////////////////////////////////////////////////////
 void loop()
 ////////////////////////////////////////////////////////////////////////
 {
-
   Serial.println ("Starting void loop");
   //navigationSensorTest(); // display reflectance sensor array reading
   //navigationLogicA();     // has 3 conditions: straight, turn left, turn right
   //navigationLogicB();     // has 7 states with varying motor responses
   //navigationLogicC();     // uses PID library
-  ////navigationLogicD();       // poor man's PID
+  navigationLogicD();       // poor man's PID
   //navigationLogicE();     // basic PID (non library) implementation
-  diagnosticDrive(5);
-
-//end of void loop  
-}
+  //diagnosticDrive(5); 
+} //end of void loop
 
 ////////////////////////////////////////////////////////////////////////
 /* FUNCTIONS  */
@@ -186,12 +153,20 @@ int pause(){
 
 int allStop(){
   // turn off drive motors
-  analogWrite(pwm_a, 0);   // motor A off ("A" refers to Ardumoto output terminals A1 and A2)
-  analogWrite(pwm_b, 0);   // motor B off ("B" refers to Ardumoto output terminals B3 and B4)
+  Serial.println("allStop - stopping both motors");
+  leftMotor.stop();
+  rightMotor.stop();
 }
  
 
 int driveForward(int speedMotorA, int speedMotorB){
+  // based on testing data, motorA/right.motor is slightly more powerful
+  // should shave about 7% off motorA's power
+  Serial.print("speedMotorA converted from ");
+  Serial.print(speedMotorA);
+  Serial.print(" to ");
+  speedMotorA = speedMotorA * .93;
+  Serial.print(speedMotorA);
   Serial.print("driveForward function: ");
   Serial.print(speedMotorA);
   Serial.print(" ");
@@ -199,29 +174,28 @@ int driveForward(int speedMotorA, int speedMotorB){
   // function accepts two arguments: speed for motorA, motorB
   // future args may include specific time to run
   // or distance to cover (if using wheel encoder)
-  digitalWrite(dir_a, LOW);  //Set motor direction, 1 low, 2 high
-  digitalWrite(dir_b, LOW);  //Set motor direction, 3 high, 4 low
-  analogWrite(pwm_a, speedMotorA);
-  analogWrite(pwm_b, speedMotorB);
+  leftMotor.move(forward, speedMotorA);
+  rightMotor.move(forward, speedMotorB);
 }
 
+/*
 int driveForwardFake(int speedMotorA, int speedMotorB){  // fake driveForward for testing
   Serial.print("driveForwardFake function: ");
   Serial.print(speedMotorA);
   Serial.print(" ");
   Serial.print(speedMotorB);
 }
+*/
 
 int driveBackward(int speedMotorA, int speedMotorB){
   // function accepts two args: speed for motorA, motorB
   // future args may include specific time to run
   // or distance to cover (for use with countable wheels)
-  digitalWrite(dir_a, HIGH);  //Set motor direction, 1 low, 2 high
-  digitalWrite(dir_b, HIGH);  //Set motor direction, 3 high, 4 low
-  analogWrite(pwm_a, speedMotorA);
-  analogWrite(pwm_b, speedMotorB);
+  leftMotor.move(backward, speedMotorA);
+  rightMotor.move(backward, speedMotorB);
 }
 
+/*
 int pivotCounterClockwise(int speedMotor, int pivotTime){
   // function accepts two args: speed for motors and time to run
   // pivots counter clockwise
@@ -250,7 +224,9 @@ int pivotCounterClockwise(int speedMotor, int pivotTime){
   analogWrite(pwm_b, speedMotorB);
   delay(pivotTime);
 }
+*/
 
+/*
 int pivotClockwise(int speedMotor, int pivotTime){
   // function accepts two args: speed for motors and time to run
   // pivots counter clockwise
@@ -279,22 +255,26 @@ int pivotClockwise(int speedMotor, int pivotTime){
   analogWrite(pwm_b, speedMotorB);
   delay(pivotTime);
 }
+*/
 
+/*
 int setDirection(int positionToCheck){
   // function accepts the position value which should be between 1 and 6999 then
   // evaluate the position value and adjust motorA/B speeds to stay on course.
   // 
 }
+*/
 
 int diagnosticDrive(int secondsToDrive){
   // drive forward for secondsToDrvie seconds
   //motorA is passenger side, motorB is driver side
-  driveForward(90,100);
+  driveForward(135,150);
   delay(5000); // hardcoding 5 seconds for now
   allStop();
   delay(50000);
 }
- 
+
+/* 
 int BackupTurnFunction(){
   // This is a basic, pre-defined backup and turn routine. You could call this
   // when, say, a forward facing ping sensor detects an object in the bot's path
@@ -309,7 +289,7 @@ int BackupTurnFunction(){
   return 0;                   // may use return values in the future, but for now,
                               // this value is not used
 }
-
+*/
 
 ////////////////////////////////////////////////////////////////////////
 int navigationSensorTest(){
@@ -383,8 +363,72 @@ int navigationSensorTest(){
 ////////////////////////////////////////////////////////////////////////
 // int navigationLogicB(){ See LineFollower_v13 }
 ////////////////////////////////////////////////////////////////////////
-// int navigationLogicC(){ See LineFollower_v13 }
+
+
 ////////////////////////////////////////////////////////////////////////
+int navigationLogicC(){
+////////////////////////////////////////////////////////////////////////
+  // Actual PID
+  //
+  // read calibrated sensor values and obtain a measure of the line position from 0 to 7000.
+  unsigned int position = qtra.readLine(sensorValues);
+  unsigned char i;
+  for (i = 0; i < NUM_SENSORS; i++)
+  {
+    Serial.print(sensorValues[i] * 10 / 1001);
+    Serial.print(' ');
+  }
+  Serial.print("  ");
+  Serial.print(position);
+  Serial.print("  ");
+  //delay(250); // Might consider removing this delay for actual competition
+  ////////////////////////////////////////////////////////////////////////
+  unsigned int sensors[8];
+  // get calibrated sensor values returned in the sensors array, along with the line position
+  // position will range from 0 to 7000, with 3000 corresponding to the line over sensor 4
+  // Will be treating sensor 4 (array position 5) as middle sensor
+  //int position = qtr.readLine(sensors);
+  // if all eight sensors see very low reflectance (black), take some appropriate action for this situation
+  // might need to revisit hardcoding 750. should consider deriving from min/max during calibration sequence
+  if (sensorValues[0] > 750 && sensorValues[1] > 750 && sensorValues[2] > 750 && sensorValues[3] > 750 && sensorValues[4] > 750 && sensorValues[5] > 750 && sensorValues[6] > 750 && sensorValues[7] > 750)
+  {
+    Serial.println(" Whoa! Everything looks black!");
+    allStop();
+    //delay(3000);
+    // do something.  Maybe this means we're at the edge of a course or about to fall off a table,
+    // in which case, we might want to stop moving, back up, and turn around.
+    //return;
+  }
+  // if all eight sensors see very high reflectance (white), take some appropriate action for this situation
+  // might need to revisit hardcoding 80. should consider deriving from min/max during calibration sequence
+  if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80)
+  {
+    Serial.println(" Whoa! Everything looks white!");
+    //allStop();
+    //delay(3000);
+    // do something.  Maybe this means we're at the edge of a course or about to fall off a table,
+    // in which case, we might want to stop moving, back up, and turn around.
+    //return;
+  } 
+  // Determine drive action based on line position value between 0 and 7000.
+  // This logic assumes a single line. No provision for intersections at this time.
+  
+  PIDinput = qtra.readLine(sensorValues);
+  myPID.Compute();
+  Serial.print("PIDoutput: ");
+  Serial.println(PIDoutput);
+  
+  // Okay, so now that I have PIDoutput, how can I put it to use?
+  
+  // if PIDoutput = 0, keep going!
+  
+  // if < 3500
+    
+  // if > 3500
+  
+}
+
+
 
 ////////////////////////////////////////////////////////////////////////
 int navigationLogicD(){
@@ -461,43 +505,43 @@ Serial.println("Enterting navigationLogicD function");
   else if (position > 0 && position < 500){
     driveForward(80, 55);
   }
-  else if (position >= 501 && position < 1000){
+  else if (position >= 500 && position < 1000){
     driveForward(90, 60);
   }
-  else if (position >= 1001 && position < 1500){
+  else if (position >= 1000 && position < 1500){
     driveForward(90, 65);
   }
-  else if (position >= 1501 && position < 2000){
+  else if (position >= 1500 && position < 2000){
     driveForward(100, 75);
   }
-  else if (position >= 2001 && position < 2500){
+  else if (position >= 2000 && position < 2500){
     driveForward(100, 80);
   }
-  else if (position >= 2501 && position < 3000){
+  else if (position >= 2500 && position < 3000){
     driveForward(100, 90);
   }
-  else if (position >= 3001 && position < 3500){
+  else if (position >= 3000 && position < 3500){
     driveForward(100, 100);
   }
-  else if (position >= 3501 && position < 4000){
+  else if (position >= 3500 && position < 4000){
     driveForward(100, 100);
   }
-  else if (position >= 4001 && position < 4500){
+  else if (position >= 4000 && position < 4500){
     driveForward(90, 100);
   }
-  else if (position >= 4501 && position < 5000){
+  else if (position >= 4500 && position < 5000){
     driveForward(80, 100);
   }
-  else if (position >= 5001 && position < 5500){
+  else if (position >= 5000 && position < 5500){
     driveForward(75, 100);
   }
-  else if (position >= 5501 && position < 6000){
+  else if (position >= 5500 && position < 6000){
     driveForward(65, 90);
   }
-  else if (position >= 6001 && position < 6500){
+  else if (position >= 6000 && position < 6500){
     driveForward(60, 90);
   }
-  else if (position >= 6501 && position < 7000){
+  else if (position >= 6500 && position < 7000){
     driveForward(55, 80);
   }
   else if (position >= 7000){
