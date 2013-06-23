@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////
 // by John Christian
 //    potus98@yahoo.com
-//    potus98.wikidot.com
+//    potus98.com
 //    @potus98 on twitter
 //
 // Code below is not entirely original. It may have snippets or entire
@@ -59,27 +59,56 @@ int buttonState = 0;         // variable for reading the pushbutton status
 // Initialize variables related to PID
 double PIDsetpoint, PIDinput, PIDoutput;
 //PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,2,5,1, DIRECT);  //2,5,1 is the default example in the library
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.1,0,0, DIRECT);  // PIDoutput makes some sense, but only for one side of array
-PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.1,0,0, DIRECT);  // 
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.1,0,0, DIRECT);  // works okay, or at least makes sense
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.025,0,0, DIRECT);  // works at first, then oscilates more and more
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.025,0,.1, DIRECT);  // oscilates sooner than prior
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.025,.1,0, DIRECT);  // better than previous, oscilates later
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.025,.05,.05, DIRECT);  // step backward
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.025,.025,0, DIRECT);  // good straight, once oscilates, falls apart fast.
+                                                                     // oscilation due to go straight related to differing motor strength?
+// added .93 motor power correction for motorA, repeating tests...
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.025,0,0, DIRECT);  // softer, farthest straight so far, but still ends in oscilation
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.075,0,0, DIRECT);  // increasing oscillation
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.5,0,0, DIRECT);  // increasing oscillation sooner than previous
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.025,.5,0, DIRECT);  // oscillation similar, harder
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,0,0, DIRECT);  // soft drifty, loses line, but re-finds smoothly if slowly
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.015,0,0, DIRECT);  // drifty at first, then starts oscillating
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,.5,0, DIRECT);  // better at first, starts oscillating
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,.1,0, DIRECT);  // a little better at first, then similar to previous
+PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,.05,0, DIRECT);  // best so far, last longest, does oscillate eventually
+
+// wheelie popping might be complicating? it's tiny, but it does happen occassionally
 
 ////////////////////////////////////////////////////////////////////////
 // Prepare 
 ////////////////////////////////////////////////////////////////////////
 void setup()
 {
+  ////////////////////////////////////////////////////////////////////////
   // initialize serial communication
   Serial.begin(115200);
-  
+
+  ////////////////////////////////////////////////////////////////////////
   // initialize LED pin as an output
   pinMode(ledPin, OUTPUT);
 
+  ////////////////////////////////////////////////////////////////////////
   // initialize pushbutton pin as an input:
   pinMode(buttonPin, INPUT);
   
+  ////////////////////////////////////////////////////////////////////////
+  // initialize maximum speed
+  // Intent here is to have one place to set a relative max speed from which
+  // other functions would calibrate.
+  // Scale limit is arduino PWM of 0-255.
+  // This may need to become a per-function setting
+  int maxSpeed = 150;
+
+  ////////////////////////////////////////////////////////////////////////
   // initialize PID variables we're linked to
   PIDinput = qtra.readLine(sensorValues); // 
   PIDsetpoint = 3500;                     // attempt to stay centered over line
-  myPID.SetOutputLimits(-255,255);              // set output limits
+  myPID.SetOutputLimits(-90,90);              // set output limits
   myPID.SetMode(AUTOMATIC);               // turn the PID on
 
   ////////////////////////////////////////////////////////////////////////
@@ -410,8 +439,7 @@ int navigationLogicC(){
   if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80)
   {
     Serial.println(" Whoa! Everything looks white!");
-    //allStop();
-    //delay(3000);
+    allStop();
     // do something.  Maybe this means we're at the edge of a course or about to fall off a table,
     // in which case, we might want to stop moving, back up, and turn around.
     //return;
@@ -433,16 +461,18 @@ int navigationLogicC(){
   
   if (position >= 3500){             // need to vere left, reduce power to MotorB/left.motor
     Serial.println("    vere Left");
-    speedMotorA = 255 - correctionAmount;
-    speedMotorB = 255;
+    speedMotorA = 150 - correctionAmount;
+    speedMotorA = speedMotorA * .93;
+    speedMotorB = 150;
     leftMotor.move(forward, speedMotorA);
     rightMotor.move(forward, speedMotorB);
   }
 
   if (position < 3500){             // need to vere right, reduce power to MotorA/right.motor
     Serial.println("    vere Right");
-    speedMotorA = 255;
-    speedMotorB = 255 - correctionAmount;
+    speedMotorA = 150;
+    speedMotorA = speedMotorA * .93;
+    speedMotorB = 150 - correctionAmount;
     leftMotor.move(forward, speedMotorA);
     rightMotor.move(forward, speedMotorB);
   } 
