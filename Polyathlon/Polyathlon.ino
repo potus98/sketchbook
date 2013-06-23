@@ -154,8 +154,9 @@ void loop()
   //navigationLogicA();     // has 3 conditions: straight, turn left, turn right
   //navigationLogicB();     // has 7 states with varying motor responses
   //navigationLogicC();     // uses PID library
-  navigationLogicD();       // poor man's PID
+  ////navigationLogicD();       // poor man's PID
   //navigationLogicE();     // basic PID (non library) implementation
+  diagnosticDrive(5);
 
 //end of void loop  
 }
@@ -283,6 +284,15 @@ int setDirection(int positionToCheck){
   // function accepts the position value which should be between 1 and 6999 then
   // evaluate the position value and adjust motorA/B speeds to stay on course.
   // 
+}
+
+int diagnosticDrive(int secondsToDrive){
+  // drive forward for secondsToDrvie seconds
+  //motorA is passenger side, motorB is driver side
+  driveForward(90,100);
+  delay(5000); // hardcoding 5 seconds for now
+  allStop();
+  delay(50000);
 }
  
 int BackupTurnFunction(){
