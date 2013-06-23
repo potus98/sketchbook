@@ -58,7 +58,9 @@ int buttonState = 0;         // variable for reading the pushbutton status
 #include <PID_v1.h>
 // Initialize variables related to PID
 double PIDsetpoint, PIDinput, PIDoutput;
-PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,2,5,1, DIRECT);
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,2,5,1, DIRECT);  //2,5,1 is the default example in the library
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.1,0,0, DIRECT);  // PIDoutput makes some sense, but only for one side of array
+PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.1,0,0, DIRECT);  // 
 
 ////////////////////////////////////////////////////////////////////////
 // Prepare 
@@ -77,6 +79,7 @@ void setup()
   // initialize PID variables we're linked to
   PIDinput = qtra.readLine(sensorValues); // 
   PIDsetpoint = 3500;                     // attempt to stay centered over line
+  myPID.SetOutputLimits(-255,255);              // set output limits
   myPID.SetMode(AUTOMATIC);               // turn the PID on
 
   ////////////////////////////////////////////////////////////////////////
@@ -122,8 +125,8 @@ void loop()
   //navigationSensorTest(); // display reflectance sensor array reading
   //navigationLogicA();     // has 3 conditions: straight, turn left, turn right
   //navigationLogicB();     // has 7 states with varying motor responses
-  //navigationLogicC();     // uses PID library
-  navigationLogicD();       // poor man's PID
+  navigationLogicC();       // uses PID library
+  //navigationLogicD();     // lookup tables, basically
   //navigationLogicE();     // basic PID (non library) implementation
   //diagnosticDrive(5); 
 } //end of void loop
@@ -162,11 +165,16 @@ int allStop(){
 int driveForward(int speedMotorA, int speedMotorB){
   // based on testing data, motorA/right.motor is slightly more powerful
   // should shave about 7% off motorA's power
-  Serial.print("speedMotorA converted from ");
-  Serial.print(speedMotorA);
-  Serial.print(" to ");
+  //Serial.print("speedMotorA converted from ");
+  //Serial.print(speedMotorA);
+  //Serial.print(" to ");
   speedMotorA = speedMotorA * .93;
-  Serial.print(speedMotorA);
+  //Serial.print(speedMotorA);
+  //
+  // Amping up the power a little without changing values in navigationLogicC
+  speedMotorA = speedMotorA * 1.5;
+  speedMotorB = speedMotorB * 1.5;
+  //
   Serial.print("driveForward function: ");
   Serial.print(speedMotorA);
   Serial.print(" ");
@@ -370,6 +378,8 @@ int navigationLogicC(){
 ////////////////////////////////////////////////////////////////////////
   // Actual PID
   //
+  int speedMotorA = 255;
+  int speedMotorB = 255;
   // read calibrated sensor values and obtain a measure of the line position from 0 to 7000.
   unsigned int position = qtra.readLine(sensorValues);
   unsigned char i;
@@ -384,10 +394,6 @@ int navigationLogicC(){
   //delay(250); // Might consider removing this delay for actual competition
   ////////////////////////////////////////////////////////////////////////
   unsigned int sensors[8];
-  // get calibrated sensor values returned in the sensors array, along with the line position
-  // position will range from 0 to 7000, with 3000 corresponding to the line over sensor 4
-  // Will be treating sensor 4 (array position 5) as middle sensor
-  //int position = qtr.readLine(sensors);
   // if all eight sensors see very low reflectance (black), take some appropriate action for this situation
   // might need to revisit hardcoding 750. should consider deriving from min/max during calibration sequence
   if (sensorValues[0] > 750 && sensorValues[1] > 750 && sensorValues[2] > 750 && sensorValues[3] > 750 && sensorValues[4] > 750 && sensorValues[5] > 750 && sensorValues[6] > 750 && sensorValues[7] > 750)
@@ -418,14 +424,28 @@ int navigationLogicC(){
   Serial.print("PIDoutput: ");
   Serial.println(PIDoutput);
   
-  // Okay, so now that I have PIDoutput, how can I put it to use?
+  // Okay, so now that I have PIDoutput ranging from -255 to 255. How should I put it to use?
+  // -255 (position is >3500) = need to turn left, reduce power to MotorB/left.motor
+  // +255 (position is <3500) = need to turn right, reduce power to MotorA/right.motor
   
-  // if PIDoutput = 0, keep going!
+  // I don't really need the negative number, I just need to konw relative distance from setpoint of 3500
+  int correctionAmount = abs(PIDoutput);
   
-  // if < 3500
-    
-  // if > 3500
-  
+  if (position >= 3500){             // need to vere left, reduce power to MotorB/left.motor
+    Serial.println("    vere Left");
+    speedMotorA = 255 - correctionAmount;
+    speedMotorB = 255;
+    leftMotor.move(forward, speedMotorA);
+    rightMotor.move(forward, speedMotorB);
+  }
+
+  if (position < 3500){             // need to vere right, reduce power to MotorA/right.motor
+    Serial.println("    vere Right");
+    speedMotorA = 255;
+    speedMotorB = 255 - correctionAmount;
+    leftMotor.move(forward, speedMotorA);
+    rightMotor.move(forward, speedMotorB);
+  } 
 }
 
 
