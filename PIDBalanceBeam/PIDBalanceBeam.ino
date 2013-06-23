@@ -1,6 +1,17 @@
-// Based on File > Examples > Servo > Knob
-// Controlling a servo position using a potentiometer (variable resistor) 
-// by Michal Rinott <http://people.interaction-ivrea.it/m.rinott> 
+////////////////////////////////////////////////////////////////////////
+// by John Christian
+//    potus98@yahoo.com
+//    potus98.com
+//    @potus98 on twitter
+//
+// Code below is not entirely original. It may have snippets or entire
+// sections from other examples or tutorials found online. Thank you
+// wonderful Internet for the help. If you see something you feel should
+// be specifically credited, please let me know! 
+//
+// Pololu is awesome. They have great customer service, great prices,
+// and great prodoucts. Not affiliated in any way. Just a satisfied customer.
+////////////////////////////////////////////////////////////////////////
 
 #include <Servo.h> 
 
@@ -16,43 +27,112 @@ int obstacle = 200; // arbitrarally init this variable to 200 inches.
                     // ie: assume it's all clear in front of you.
                     // (Not necessary for this example, but will be
                     // used later for obstacle avoidance bot.)
-
+                    
+int timeToPing = 0;
+int BallPosition = 0;
+int TubeAngle = 90;
+int setPoint = 24;
+int servoPos = 90;
 
 void setup() 
 { 
-  Serial.begin(9600);
-  myservo.attach(9);  // attaches the servo on pin 9 to the servo object 
-  
-  // SETUP serial port monitor
-  // initialize serial communication
   Serial.begin(115200);
-} 
+  myservo.attach(9);  // attaches the servo on pin 9 to the servo object 
+  myservo.write(90);
+  Serial.println ("Level tube now...");
+  delay(10000);
+  Serial.println ("Tube should be level by now!");
+  delay(5000);
+}
 
-void loop() 
+////////////////////////////////////////////////////////////////////////
+void loop()
 
-{ 
-  val = analogRead(potpin);            // reads the value of the potentiometer (value between 0 and 1023) 
-  Serial.println(val);  
-  val = map(val, 50, 300, 0, 179);     // scale it to use it with the servo (value between 0 and 180) 
-  myservo.write(val);                  // sets the servo position according to the scaled value 
-  delay(15);                           // waits for the servo to get there 
-  
-  // Set the obstacle variable to the results of the pingChecker function
-  obstacle = pingChecker(5);    // call the pingChecker function with argument of 5
-  // Adjust the sensitivity of the bot here.
-  // pingChecker argument = number of measurements to collect.
-  // Some sensors don't read closer than a certain distance
-  // Sparkfun ultrasonic distance sensor EZ1 doesn't seem to read <5" very well
-  // pingChecker function will use the arg of 5 to collect 5 distance
-  // measurements and average them together to help smooth out spurious
-  // readings.
-  delay(50);    // pause for a moment to allow easier reading of Serial Monitor
+{
+  BallPosition = getBallPosition();
+  decideMovement();
+//  moveTube();
+  Serial.println("delay 10 in void loop");
+  delay(10);
   
 } 
 
 ////////////////////////////////////////////////////////////////////////
 /* FUNCTIONS  */
 ////////////////////////////////////////////////////////////////////////
+
+int getBallPosition(){
+  Serial.println("entering getBallPosition");
+  long duration, inches, cm;
+  // The PING))) is triggered by a HIGH pulse of 2 or more microseconds.
+  // Give a short LOW pulse beforehand to ensure a clean HIGH pulse:
+  pinMode(pingPin, OUTPUT);
+  Serial.println("pingPin LOW");
+  digitalWrite(pingPin, LOW);
+  delayMicroseconds(2); // original value: 2
+  Serial.println("pingPin HIGH");
+  digitalWrite(pingPin, HIGH);
+  delayMicroseconds(5); // original value: 5
+  Serial.println("pingPin LOW");
+  digitalWrite(pingPin, LOW);
+  // This is where the ping distance is read in...
+  // The same pin is used to read the signal from the PING))): a HIGH
+  // pulse whose duration is the time (in microseconds) from the sending
+  // of the ping to the reception of its echo off of an object.
+  pinMode(pingPin, INPUT);
+  Serial.println("calc duration");
+  duration = pulseIn(pingPin, HIGH);
+  inches = microsecondsToInches(duration);
+  Serial.println("delay 10 in getBallPosition");
+  delay(10); // dialed down to 2 seemed to cause spurious readings.
+            // 5 a little flakey?
+            // 8 seemed pretty okay
+            // 10 consistent, good
+  return inches;
+  
+  /*
+  val = analogRead(potpin);            // reads the value of the potentiometer (value between 0 and 1023) 
+  //Serial.println(val);  
+  val = map(val, 50, 300, 0, 179);     // scale it to use it with the servo (value between 0 and 180) 
+  myservo.write(val);                  // sets the servo position according to the scaled value 
+  //delay(15);                           // waits for the servo to get there 
+  delay(15);                           // waits for the servo to get there. original value 15
+  timeToPing++;
+  Serial.println(timeToPing);
+  // Set the obstacle variable to the results of the pingChecker function
+  if (timeToPing > 30) {
+    obstacle = pingChecker(1);    // call the pingChecker function with argument of 5
+    timeToPing = 0;
+  }
+  */
+  
+} // close getBallPosition function
+
+int decideMovement(){
+  
+  servoPos = myservo.read();
+  
+  Serial.print ("                                BallPosition: ");
+  Serial.print (BallPosition);
+  Serial.print (" servoPos: ");
+  Serial.print (servoPos);  
+   
+  if ( servoPos > 50 && BallPosition < setPoint ){
+    servoPos--;
+    Serial.print (" about to move servo to pos ");
+    Serial.print (servoPos);
+    myservo.write(servoPos);
+  }
+  if ( servoPos <= 130 && BallPosition > setPoint ){
+    servoPos++;
+    Serial.print (" about to move servo to pos ");
+    Serial.print (servoPos);
+    myservo.write(servoPos);
+  }
+  Serial.println (" ");
+  
+} // close decideMovement function
+
 
 int pingChecker(int pingCount){
   ////Serial.print("Entering pingChecker function with pingCount of ");
@@ -74,9 +154,9 @@ int pingChecker(int pingCount){
     // Give a short LOW pulse beforehand to ensure a clean HIGH pulse:
     pinMode(pingPin, OUTPUT);
     digitalWrite(pingPin, LOW);
-    delayMicroseconds(2);
+    delayMicroseconds(2); // original value: 2
     digitalWrite(pingPin, HIGH);
-    delayMicroseconds(5);
+    delayMicroseconds(5); // original value: 5
     digitalWrite(pingPin, LOW);
     // This is where the ping distance is read in...
     // The same pin is used to read the signal from the PING))): a HIGH
@@ -105,13 +185,16 @@ int pingChecker(int pingCount){
   // This section simply prints the values to serial out
   // for easy monitoring or troubleshooting 
   Serial.print(inches);
-  Serial.println("in");
+  Serial.println(" in");
   //Serial.print(cm);
   //Serial.print("cm");
   //Serial.println();
 
   //  delay(100); original of 100
-  delay(50);
+  delay(10); // dialed down to 2 seemed to cause spurious readings.
+            // 5 a little flakey?
+            // 8 seemed pretty okay
+            // 10 consistent, good
 
   return inches;
   // close pingChecker function 
