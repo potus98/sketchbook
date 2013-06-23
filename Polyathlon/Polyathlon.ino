@@ -154,8 +154,8 @@ void loop()
   //navigationLogicA();     // has 3 conditions: straight, turn left, turn right
   //navigationLogicB();     // has 7 states with varying motor responses
   //navigationLogicC();     // uses PID library
-  //navigationLogicD();     // derived from B, but handles 90 degree intersections and turns
-  navigationLogicE();       // basic PID (non library) implementation
+  navigationLogicD();       // poor man's PID
+  //navigationLogicE();     // basic PID (non library) implementation
 
 //end of void loop  
 }
@@ -448,33 +448,47 @@ Serial.println("Enterting navigationLogicD function");
     //pivotCounterClockwise(80,0);  // Seems to pivot too fast.
     driveForward(75, 0);            // Try pivot on left wheel instead of center of vehicle.
   }
-  else if (position > 0 && position < 1000){
-    Serial.println("    Left Strong ");
-    driveForward(90, 55);
+  else if (position > 0 && position < 500){
+    driveForward(80, 55);
   }
-  else if (position >= 1000 && position < 2000){
-    Serial.println("    Left Moderate ");
-    driveForward(90, 75);
+  else if (position >= 501 && position < 1000){
+    driveForward(90, 60);
   }
-  else if (position >= 2000 && position < 3000){
-    Serial.println("    Left Slight ");
-    driveForward(100, 85);
+  else if (position >= 1001 && position < 1500){
+    driveForward(90, 65);
   }
-  else if (position >= 3000 && position < 4000){
-    Serial.println("    Straight Ahead ");
+  else if (position >= 1501 && position < 2000){
+    driveForward(100, 75);
+  }
+  else if (position >= 2001 && position < 2500){
+    driveForward(100, 80);
+  }
+  else if (position >= 2501 && position < 3000){
+    driveForward(100, 90);
+  }
+  else if (position >= 3001 && position < 3500){
     driveForward(100, 100);
   }
-  else if (position >= 4000 && position < 5000){
-    Serial.println("    Right Slight ");
-    driveForward(85, 100);
+  else if (position >= 3501 && position < 4000){
+    driveForward(100, 100);
   }
-  else if (position >= 5000 && position < 6000){
-    Serial.println("    Right Moderate ");
-    driveForward(75, 90);
+  else if (position >= 4001 && position < 4500){
+    driveForward(90, 100);
   }
-  else if (position >= 6000 && position < 7000){
-    Serial.println("    Right Strong ");
-    driveForward(55, 90);
+  else if (position >= 4501 && position < 5000){
+    driveForward(80, 100);
+  }
+  else if (position >= 5001 && position < 5500){
+    driveForward(75, 100);
+  }
+  else if (position >= 5501 && position < 6000){
+    driveForward(65, 90);
+  }
+  else if (position >= 6001 && position < 6500){
+    driveForward(60, 90);
+  }
+  else if (position >= 6501 && position < 7000){
+    driveForward(55, 80);
   }
   else if (position >= 7000){
     Serial.println("    Right Pivot ");
@@ -507,7 +521,34 @@ int navigationLogicE(){
   ////////////////////////////////////////////////////////////////////////
   unsigned int sensors[8];  // not sure why this is here.
   
+  // set point should be 3500. This is the target value of "position". The target this algorithm is trying to achieve.
+  int setPoint = 3500;
+  int Kp = .1;
+  int Ki = 1;
+  int Kd = 1;
+  int proportional = 3500;
+  int integral = 1;
+  int derivative = 1;
+  int lastProportional = 1;
+  int errorValue = 1;
   
+  // Calculate PID
+  proportional = position - setPoint;
+  integral = integral + proportional;
+  derivative = proportional - lastProportional;
+  lastProportional = proportional;
+  errorValue = int(proportional * Kp + integral * Ki + derivative * Kd);
+  
+  Serial.print("                    proportional: ");
+  Serial.print(proportional);
+  Serial.print(" integral: ");
+  Serial.print(integral);
+  Serial.print(" derivative: ");
+  Serial.print(derivative);
+  Serial.print(" lastProportional: ");
+  Serial.print(lastProportional);
+  Serial.print(" errorValue: ");
+  Serial.println(errorValue);
 
   // might need to revisit hardcoding 750. should consider deriving from min/max during calibration sequence
   // CHECK for all black (all sensors very low reflectance) won't need for line following loop course.
@@ -526,8 +567,44 @@ int navigationLogicE(){
   
   // Determine drive action based on line position value between 0 and 7000.
   // This logic assumes a single line. No provision for intersections at this time.
-
+  
+  // Following is a John hack. Very simple P implementation assuming full motor speed is 100.
+  // Take the proportional value (position - setPoint) which will range from -3500 to 3500 and
+  // multiply by .1 to convert, say, 3500 to 35, then multiply by 2
+  // Subtract the resulting value from max speed of motor.
+  
+  if (proportional < 0)
+  {
+    Serial.println("                    proportional is less than 0");
+    // Turn left
+    proportional = abs(proportional);
+    Serial.print("abs of proportional is: ");
+    Serial.println(proportional);
+    proportional = ((proportional * .01) *2);
+    Serial.print("adjusted proportional is: ");
+    Serial.println(proportional);
+    proportional = (100 - proportional);
+    Serial.print("adjusted speed is: ");
+    Serial.println(proportional);
+    driveForward(100, proportional);
+  }
+  
+  if (proportional > 0)
+  {
+    Serial.println("                    proportional is less than 0");
+    // Turn right
+    proportional = abs(proportional);
+    Serial.print("abs of proportional is: ");
+    Serial.println(proportional);
+    proportional = ((proportional * .01) *2);
+    Serial.print("adjusted proportional is: ");
+    Serial.println(proportional);
+    proportional = (100 - proportional);
+    Serial.print("adjusted speed is: ");
+    Serial.println(proportional);
+    driveForward(proportional, 100);
+  }
 
 //Serial.println("end of navigationLogicE function");
-delay(300); // Remove this delay for final testing and actual competition
+//delay(300); // Remove this delay for final testing and actual competition
 }
