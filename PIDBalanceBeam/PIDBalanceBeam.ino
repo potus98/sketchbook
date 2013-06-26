@@ -14,14 +14,13 @@
 ////////////////////////////////////////////////////////////////////////
 
 #include <Servo.h>
-Servo myservo;  // create servo object to control a servo 
-int potpin = 0;  // analog pin used to connect the potentiometer
-int val;    // variable to read the value from the analog pin 
+Servo myservo;   // create servo object to control a servo 
+int val;         // variable to read the value from the analog pin 
 
 #include <PID_v1.h>
-double PIDsetpoint, PIDinput, PIDoutput; // define varibles PID will be connecting to
-PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,1,5,1, DIRECT);  // specify PID links and initial tuning parameters (2,5,1 initial starting point)
-
+double PIDsetpoint, PIDinput, PIDoutput;                       // define varibles PID will be connecting to
+PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,1,5,1, DIRECT);  // specify PID links and initial tuning parameters
+                                                               // 2,5,1 was the initial starting point
 // from br3ttb on arduino forums...
 // Parameters and what they do (sort of)
 // P_Param:  the bigger the number the harder the controller pushes.
@@ -36,20 +35,18 @@ int PIDoutputConstrained = 0;
 const int pingPin = 7;
 
 int obstacle = 200; // arbitrarally init this variable to 200 inches.
-                    // ie: assume it's all clear in front of you.
-                    // (Not necessary for this example, but will be
-                    // used later for obstacle avoidance bot.)
-                    
+
 int timeToPing = 0;
 int BallPosition = 0;
 int TubeAngle = 90;
 int setPoint = 24;
 int servoPos = 90;
+int TestRuns = 0;
 
 void setup() 
 { 
   Serial.begin(115200);
-  myservo.attach(9); // attaches the servo on pin 9 to the servo object 
+  myservo.attach(9);    // attaches the servo on pin 9 to the servo object 
   myservo.write(90);
   Serial.println ("Level tube now...");
   delay(10000);
@@ -57,38 +54,33 @@ void setup()
   delay(5000);
   
   PIDinput = getBallPosition(); // initialize PID variables
-  PIDsetpoint = 22;             // set the targe ball position
+  PIDsetpoint = 22;             // set the target ball position
   myPID.SetMode(AUTOMATIC);     // turn the PID on
+  Serial.println("PID tunings: 1,5,1");
+  Serial.println("PIDsetpoint BallPosition PIDoutput PIDoutputMapped");
 }
 
 ////////////////////////////////////////////////////////////////////////
 void loop()
 
 {
-  //BallPosition = getBallPosition();
-  PIDinput = getBallPosition();
-  Serial.print("                            PIDinput: ");
-  Serial.print(PIDinput);
-  myPID.Compute();
-  Serial.print(" PIDoutput: ");
-  Serial.print(PIDoutput); // the PIDoutput ranges from 0 - 255. Probably need to map this to servo 50-130 range
-                             // 0 should lift up since ball far from sensor
-                             // 255 should tilt down since ball is close to sensor
-  //PIDoutputMapped = map(PIDoutput, 0, 255, 50, 130); // re-map 0-255 PIDoutput values to servo's 50-130 position range
-  PIDoutputMapped = map(PIDoutput, 0, 255, 130, 50); // need to reverse (?)
-  Serial.print(" PIDoutputMapped: ");
-  Serial.print(PIDoutputMapped);
-  PIDoutputConstrained = constrain (PIDoutputMapped, 50, 130); // constrain values so servo won't tear up the rig
-  Serial.print(" PIDoutputConstrained: ");
-  Serial.println(PIDoutputConstrained);
-  myservo.write(PIDoutputConstrained); // The big test! (may want to move PID-related lines above into a function)
-  //decideMovement();
-  //decideMovementWithPID();
-  //Serial.println("delay in void loop");
-  delay(10); // preferred setting
-  //delay(60); // slowing to read screen
-  
-} 
+  while (TestRuns < 1000) {
+    TestRuns++;
+    PIDinput = getBallPosition();
+    myPID.Compute();
+    PIDoutputMapped = map(PIDoutput, 0, 255, 130, 50);
+    PIDoutputConstrained = constrain (PIDoutputMapped, 50, 130); // constrain values so servo won't tear up the rig
+    myservo.write(PIDoutputConstrained); // The big test! (may want to move PID-related lines above into a function)
+    delay(10); // 10 is preferred setting
+    Serial.print(PIDsetpoint);
+    Serial.print(" ");
+    Serial.print(PIDinput);
+    Serial.print(" ");
+    Serial.print(PIDoutput);
+    Serial.print(" ");
+    Serial.println(PIDoutputMapped);
+  } // end of while loop
+}   // end of void loop
 
 ////////////////////////////////////////////////////////////////////////
 /* FUNCTIONS  */
