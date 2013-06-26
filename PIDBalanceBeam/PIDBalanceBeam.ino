@@ -20,7 +20,14 @@ int val;    // variable to read the value from the analog pin
 
 #include <PID_v1.h>
 double PIDsetpoint, PIDinput, PIDoutput; // define varibles PID will be connecting to
-PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,2,5,1, DIRECT);  // specify PID links and initial tuning parameters
+PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,1,5,1, DIRECT);  // specify PID links and initial tuning parameters (2,5,1 initial starting point)
+
+// from br3ttb on arduino forums...
+// Parameters and what they do (sort of)
+// P_Param:  the bigger the number the harder the controller pushes.
+// I_Param:  the SMALLER the number (except for 0, which turns it off,)  the more quickly the controller reacts to load changes, but the greater the risk of oscillations.
+// D_Param: the bigger the number  the more the controller dampens oscillations (to the point where performance can be hindered)
+
 int PIDoutputMapped = 0;
 int PIDoutputConstrained = 0;
 
