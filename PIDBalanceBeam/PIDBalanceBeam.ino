@@ -64,22 +64,27 @@ void setup()
 void loop()
 
 {
-  while (TestRuns < 1000) {
-    TestRuns++;
-    PIDinput = getBallPosition();
-    myPID.Compute();
-    PIDoutputMapped = map(PIDoutput, 0, 255, 130, 50);
-    PIDoutputConstrained = constrain (PIDoutputMapped, 50, 130); // constrain values so servo won't tear up the rig
-    myservo.write(PIDoutputConstrained); // The big test! (may want to move PID-related lines above into a function)
-    delay(10); // 10 is preferred setting
-    Serial.print(PIDsetpoint);
-    Serial.print(" ");
-    Serial.print(PIDinput);
-    Serial.print(" ");
-    Serial.print(PIDoutput);
-    Serial.print(" ");
-    Serial.println(PIDoutputMapped);
-  } // end of while loop
+  PIDinput = getBallPosition();
+  myPID.Compute();
+  PIDoutputMapped = map(PIDoutput, 0, 255, 130, 50);
+  PIDoutputConstrained = constrain (PIDoutputMapped, 50, 130); // constrain values so servo won't tear up the rig
+  myservo.write(PIDoutputConstrained); // The big test! (may want to move PID-related lines above into a function)
+  delay(10); // 10 is preferred setting
+  Serial.print(PIDsetpoint);
+  Serial.print(" ");
+  Serial.print(PIDinput);
+  Serial.print(" ");
+  Serial.print(PIDoutput);
+  Serial.print(" ");
+  Serial.println(PIDoutputMapped);
+  TestRuns++;
+  if (TestRuns > 2000){
+    Serial.print(TestRuns);
+    Serial.println(" TestRuns complete. Returning servo to position 90.");
+    myservo.write(90);
+    delay(100000);
+    TestRuns = 0;
+  }
 }   // end of void loop
 
 ////////////////////////////////////////////////////////////////////////
