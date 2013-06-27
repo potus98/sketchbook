@@ -1,4 +1,5 @@
 ////////////////////////////////////////////////////////////////////////
+// PID Demo Sketch for use with PID Balance Beam rig. See: http://potus98.com
 // by John Christian
 //    potus98@yahoo.com
 //    potus98.com
@@ -13,36 +14,29 @@
 // and great prodoucts. Not affiliated in any way. Just a satisfied customer.
 ////////////////////////////////////////////////////////////////////////
 
-#include <Servo.h>
-Servo myservo;   // create servo object to control a servo 
-int val;         // variable to read the value from the analog pin 
+#include <Servo.h>  // include the Servo library
+Servo myservo;      // create servo object to control a servo 
+int val;            // variable to read the value from the analog pin 
 
-#include <PID_v1.h>
+#include <PID_v1.h>  // include the PID library See: http://playground.arduino.cc/Code/PIDLibrary
 double PIDsetpoint, PIDinput, PIDoutput;                       // define varibles PID will be connecting to
 PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,1,5,1, DIRECT);  // specify PID links and initial tuning parameters
                                                                // 2,5,1 was the initial starting point
-// from br3ttb on arduino forums...
-// Parameters and what they do (sort of)
+// from br3ttb on arduino forums... Parameters and what they do (sort of)
 // P_Param:  the bigger the number the harder the controller pushes.
 // I_Param:  the SMALLER the number (except for 0, which turns it off,)  the more quickly the controller reacts to load changes, but the greater the risk of oscillations.
 // D_Param: the bigger the number  the more the controller dampens oscillations (to the point where performance can be hindered)
 
-int PIDoutputMapped = 0;
-int PIDoutputConstrained = 0;
+int PIDoutputMapped = 0;       // used when mapping PID output to safe servo range so servo doesn't twist demo rig apart
+int PIDoutputConstrained = 0;  // extra safety against sending servo to positions that might break the demo rig
+const int pingPin = 7;         // defines signal pin used by ping sensor
+int timeToPing = 0;            // used during ping sensor operation
+int BallPosition = 0;          // calculated distance of ball from sensor
+int setPoint = 24;             // hardcoded target point (to-do: make adjustable via potentiometer)
+int servoPos = 90;             // servo position
+int TestRuns = 0;              // counter used to limit total number of cycles to make data collection easier
 
-// this constant won't change.  It's the pin number
-// of the sensor's output:
-const int pingPin = 7;
-
-int obstacle = 200; // arbitrarally init this variable to 200 inches.
-
-int timeToPing = 0;
-int BallPosition = 0;
-int TubeAngle = 90;
-int setPoint = 24;
-int servoPos = 90;
-int TestRuns = 0;
-
+////////////////////////////////////////////////////////////////////////
 void setup() 
 { 
   Serial.begin(115200);
@@ -52,24 +46,70 @@ void setup()
   delay(10000);
   Serial.println ("Tube should be level by now!");
   delay(5000);
-  
-  PIDinput = getBallPosition(); // initialize PID variables
-  PIDsetpoint = 22;             // set the target ball position
+  PIDinput = getBallPosition(); // initialize PID variable
+  PIDsetpoint = 24;             // set the target ball position (to-do: make adjustable via potentiometer)
   myPID.SetMode(AUTOMATIC);     // turn the PID on
-  Serial.println("PID tunings: 1,5,1");
-  Serial.println("PIDsetpoint BallPosition PIDoutput PIDoutputMapped");
 }
 
 ////////////////////////////////////////////////////////////////////////
 void loop()
-
 {
+  
+ //decideMovement();         // Simple function to exercise rig mechanics
+ decideMovementWithPID();    // The PID version you're probably most interested in using.
+
+}   // end of void loop
+
+/////////////////////////////* FUNCTIONS  */////////////////////////////
+
+////////////////////////////////////////////////////////////////////////
+
+int decideMovement(){
+
+  if (TestRuns == 0){
+    Serial.println("No PID");
+    Serial.println("setpoint BallPosition servoPosition");
+  }  
+  BallPosition=getBallPosition();
+  servoPos = myservo.read();
+  if ( servoPos > 50 && BallPosition < setPoint ){
+    servoPos--;
+    myservo.write(servoPos);
+  }
+  if ( servoPos <= 130 && BallPosition > setPoint ){
+    servoPos++;
+    myservo.write(servoPos);
+  }
+  delay(25); // Provide time for servo to reach destination.
+  
+  Serial.print (setPoint);
+  Serial.print(" ");
+  Serial.print (BallPosition);
+  Serial.print(" ");
+  Serial.println (servoPos);  
+  TestRuns++;
+  if (TestRuns > 2000){
+    Serial.print(TestRuns);
+    Serial.println(" TestRuns complete. Pausing for 2 minutes...");
+    Serial.println(" ");
+    delay(120000);
+    TestRuns = 0;
+  }
+} // close decideMovement function
+
+////////////////////////////////////////////////////////////////////////
+int decideMovementWithPID(){
+  
+  if (TestRuns == 0){
+    Serial.println("PID tunings: 1,5,1");
+    Serial.println("PIDsetpoint BallPosition PIDoutput PIDoutputMapped");
+  }  
   PIDinput = getBallPosition();
   myPID.Compute();
   PIDoutputMapped = map(PIDoutput, 0, 255, 130, 50);
   PIDoutputConstrained = constrain (PIDoutputMapped, 50, 130); // constrain values so servo won't tear up the rig
-  myservo.write(PIDoutputConstrained); // The big test! (may want to move PID-related lines above into a function)
-  delay(10); // 10 is preferred setting
+  myservo.write(PIDoutputConstrained);
+  delay(25); // Provide time for servo to reach destination.
   Serial.print(PIDsetpoint);
   Serial.print(" ");
   Serial.print(PIDinput);
@@ -78,164 +118,36 @@ void loop()
   Serial.print(" ");
   Serial.println(PIDoutputMapped);
   TestRuns++;
-  if (TestRuns > 2000){
+  if ( TestRuns > 2000 ){
     Serial.print(TestRuns);
-    Serial.println(" TestRuns complete. Returning servo to position 90.");
-    myservo.write(90);
-    delay(100000);
+    Serial.println(" TestRuns complete. Pausing for 2 minutes...");
+    Serial.println(" ");
+    delay(120000);
     TestRuns = 0;
   }
-}   // end of void loop
-
-////////////////////////////////////////////////////////////////////////
-/* FUNCTIONS  */
-////////////////////////////////////////////////////////////////////////
-
-int getBallPosition(){
-  //Serial.println("entering getBallPosition");
-  long duration, inches, cm;
-  // The PING))) is triggered by a HIGH pulse of 2 or more microseconds.
-  // Give a short LOW pulse beforehand to ensure a clean HIGH pulse:
-  pinMode(pingPin, OUTPUT);
-  //Serial.println("pingPin LOW");
-  digitalWrite(pingPin, LOW);
-  delayMicroseconds(2); // original value: 2
-  //Serial.println("pingPin HIGH");
-  digitalWrite(pingPin, HIGH);
-  delayMicroseconds(5); // original value: 5
-  //Serial.println("pingPin LOW");
-  digitalWrite(pingPin, LOW);
-  // This is where the ping distance is read in...
-  // The same pin is used to read the signal from the PING))): a HIGH
-  // pulse whose duration is the time (in microseconds) from the sending
-  // of the ping to the reception of its echo off of an object.
-  pinMode(pingPin, INPUT);
-  //Serial.println("calc duration");
-  duration = pulseIn(pingPin, HIGH);
-  inches = microsecondsToInches(duration);
-  //Serial.println("delay 10 in getBallPosition");
-  delay(10); // dialed down to 2 seemed to cause spurious readings.
-            // 5 a little flakey?
-            // 8 seemed pretty okay
-            // 10 consistent, good
-  return inches;
-  
-  /*
-  val = analogRead(potpin);            // reads the value of the potentiometer (value between 0 and 1023) 
-  //Serial.println(val);  
-  val = map(val, 50, 300, 0, 179);     // scale it to use it with the servo (value between 0 and 180) 
-  myservo.write(val);                  // sets the servo position according to the scaled value 
-  //delay(15);                           // waits for the servo to get there 
-  delay(15);                           // waits for the servo to get there. original value 15
-  timeToPing++;
-  Serial.println(timeToPing);
-  // Set the obstacle variable to the results of the pingChecker function
-  if (timeToPing > 30) {
-    obstacle = pingChecker(1);    // call the pingChecker function with argument of 5
-    timeToPing = 0;
-  }
-  */
-  
-} // close getBallPosition function
-
-////////////////////////////////////////////////////////////////////////
-int decideMovement(){
-  
-  servoPos = myservo.read();
-  
-  Serial.print ("                                BallPosition: ");
-  Serial.print (BallPosition);
-  Serial.print (" servoPos: ");
-  Serial.print (servoPos);  
-   
-  if ( servoPos > 50 && BallPosition < setPoint ){
-    servoPos--;
-    Serial.print (" about to move servo to pos ");
-    Serial.print (servoPos);
-    myservo.write(servoPos);
-  }
-  if ( servoPos <= 130 && BallPosition > setPoint ){
-    servoPos++;
-    Serial.print (" about to move servo to pos ");
-    Serial.print (servoPos);
-    myservo.write(servoPos);
-  }
-  Serial.println (" ");
-  
-} // close decideMovement function
-
-////////////////////////////////////////////////////////////////////////
-int decideMovementWithPID(){
-  
-  
 } // close decideMovementWithPID function
 
 ////////////////////////////////////////////////////////////////////////
-int pingChecker(int pingCount){
-  ////Serial.print("Entering pingChecker function with pingCount of ");
-  ////Serial.println(pingCount);
-  // This function will accept one integer argument
-  //    - number of pings to execute
-  // Then return the averaged result of all pings performed
-
-  // establish variables for duration of the ping,
-  // and the distance result in inches and centimeters:
+int getBallPosition(){
   long duration, inches, cm;
-  long totalDuration = 0;
-
-  for (int x = 0; x < pingCount; x++){
-    ////Serial.print("Entering for loop with x at ");
-    ////Serial.println(x);
-
-    // The PING))) is triggered by a HIGH pulse of 2 or more microseconds.
-    // Give a short LOW pulse beforehand to ensure a clean HIGH pulse:
-    pinMode(pingPin, OUTPUT);
-    digitalWrite(pingPin, LOW);
-    delayMicroseconds(2); // original value: 2
-    digitalWrite(pingPin, HIGH);
-    delayMicroseconds(5); // original value: 5
-    digitalWrite(pingPin, LOW);
-    // This is where the ping distance is read in...
-    // The same pin is used to read the signal from the PING))): a HIGH
-    // pulse whose duration is the time (in microseconds) from the sending
-    // of the ping to the reception of its echo off of an object.
-    pinMode(pingPin, INPUT);
-    duration = pulseIn(pingPin, HIGH);
-    ////Serial.print("duration: ");
-    ////Serial.println(duration);
-    totalDuration = totalDuration + duration;
-  }
-  ////Serial.print("totalDuration: ");
-  ////Serial.println(totalDuration);
-
-  // Compute the average duration of all the for loop passes
-
-  long averageDuration = totalDuration / pingCount;
-  ////Serial.print("averageDuration: ");
-  ////Serial.println(averageDuration);
-
-  // ...Then the ping distance is converted to inches and cm
-  // convert the time into a distance
-  //cm = microsecondsToCentimeters(averageDuration);
-  inches = microsecondsToInches(averageDuration);
-
-  // This section simply prints the values to serial out
-  // for easy monitoring or troubleshooting 
-  Serial.print(inches);
-  Serial.println(" in");
-  //Serial.print(cm);
-  //Serial.print("cm");
-  //Serial.println();
-
-  //  delay(100); original of 100
-  delay(10); // dialed down to 2 seemed to cause spurious readings.
-            // 5 a little flakey?
-            // 8 seemed pretty okay
-            // 10 consistent, good
-
-  return inches;
-  // close pingChecker function 
-}
+                                    // The PING))) is triggered by a HIGH pulse of 2 or more microseconds.
+                                    // Give a short LOW pulse beforehand to ensure a clean HIGH pulse:
+  pinMode(pingPin, OUTPUT);
+  digitalWrite(pingPin, LOW);
+  delayMicroseconds(2);              // original value: 2
+  digitalWrite(pingPin, HIGH);
+  delayMicroseconds(5);              // original value: 5
+  digitalWrite(pingPin, LOW);
+                                     // This is where the ping distance is read in...
+                                     // The same pin is used to read the signal from the PING))): a HIGH
+                                     // pulse whose duration is the time (in microseconds) from the sending
+                                     // of the ping to the reception of its echo off of an object.
+  pinMode(pingPin, INPUT);
+  duration = pulseIn(pingPin, HIGH);
+  inches = microsecondsToInches(duration);
+  delay(15);                         // Setting too low seemed to introduce issues. Too much ping noise in tube?
+  return inches;  
+} // close getBallPosition function
 
 ////////////////////////////////////////////////////////////////////////
 long microsecondsToInches(long microseconds)
