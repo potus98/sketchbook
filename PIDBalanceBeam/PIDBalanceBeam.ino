@@ -78,11 +78,11 @@ int decideMovement(){
   }  
   BallPosition=getBallPosition();
   servoPos = myservo.read();
-  if ( servoPos > 50 && BallPosition < setPoint ){
+  if ( servoPos > 30 && BallPosition < setPoint ){
     servoPos--;
     myservo.write(servoPos);
   }
-  if ( servoPos <= 130 && BallPosition > setPoint ){
+  if ( servoPos <= 150 && BallPosition > setPoint ){
     servoPos++;
     myservo.write(servoPos);
   }
@@ -112,8 +112,8 @@ int decideMovementWithPID(){
   }  
   PIDinput = getBallPosition();
   myPID.Compute();
-  PIDoutputMapped = map(PIDoutput, 0, 255, 130, 50);
-  PIDoutputConstrained = constrain (PIDoutputMapped, 50, 130); // constrain values so servo won't tear up the rig
+  PIDoutputMapped = map(PIDoutput, 0, 255, 150, 30);
+  PIDoutputConstrained = constrain (PIDoutputMapped, 30, 150); // constrain values so servo won't tear up the rig
   myservo.write(PIDoutputConstrained);
   delay(25); // Provide time for servo to reach destination.
   Serial.print(PIDsetpoint);
