@@ -21,10 +21,10 @@ int val;            // variable to read the value from the analog pin
 #include <PID_v1.h>  // include the PID library See: http://playground.arduino.cc/Code/PIDLibrary
 double PIDsetpoint, PIDinput, PIDoutput;                       // define varibles PID will be connecting to
 
-PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,4,1,2, DIRECT);  // specify PID links and initial tuning parameters
+PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,7,.6,3, DIRECT);  // specify PID links and initial tuning parameters
 //                                              ^
 //                                              |
-//                                              `<<< Change PID here 2/2 <<<<
+//                                              `<<< Change PID here 1/2 <<<<
 
 
                                                                // 2,5,1 was the initial starting point
@@ -107,7 +107,7 @@ int decideMovement(){
 int decideMovementWithPID(){
   
   if (TestRuns == 0){
-    Serial.println("PID tunings: 4,1,2");                                         //   <<< Change PID here 2/2 <<<<
+    Serial.println("PID tunings: 7,.6,3");                                         //   <<< Change PID here 2/2 <<<<
     Serial.println("PIDsetpoint BallPosition PIDoutput PIDoutputMapped");
   }  
   PIDinput = getBallPosition();
