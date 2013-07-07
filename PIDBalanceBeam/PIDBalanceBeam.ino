@@ -21,7 +21,7 @@ int val;            // variable to read the value from the analog pin
 #include <PID_v1.h>  // include the PID library See: http://playground.arduino.cc/Code/PIDLibrary
 double PIDsetpoint, PIDinput, PIDoutput;                       // define varibles PID will be connecting to
 
-PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,7,.6,3, DIRECT);  // specify PID links and initial tuning parameters
+PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,9,2,.5, DIRECT);  // specify PID links and initial tuning parameters
 //                                              ^
 //                                              |
 //                                              `<<< Change PID here 1/2 <<<<
@@ -29,16 +29,16 @@ PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,7,.6,3, DIRECT);  // specify PID l
 
                                                                // 2,5,1 was the initial starting point
 // from br3ttb on arduino forums... Parameters and what they do (sort of)
-// P_Param:  the bigger the number the harder the controller pushes.
-// I_Param:  the SMALLER the number (except for 0, which turns it off,)  the more quickly the controller reacts to load changes, but the greater the risk of oscillations.
-// D_Param: the bigger the number  the more the controller dampens oscillations (to the point where performance can be hindered)
+// P_Param: the bigger the number the harder the controller pushes.
+// I_Param: the SMALLER the number (except for 0, which turns it off,)  the more quickly the controller reacts to load changes, but the greater the risk of oscillations.
+// D_Param: the bigger the number the more the controller dampens oscillations (to the point where performance can be hindered)
 
 int PIDoutputMapped = 0;       // used when mapping PID output to safe servo range so servo doesn't twist demo rig apart
 int PIDoutputConstrained = 0;  // extra safety against sending servo to positions that might break the demo rig
 const int pingPin = 7;         // defines signal pin used by ping sensor
 int timeToPing = 0;            // used during ping sensor operation
 int BallPosition = 0;          // calculated distance of ball from sensor
-int setPoint = 24;             // hardcoded target point (to-do: make adjustable via potentiometer)
+int setPoint = 30;             // hardcoded target point (to-do: make adjustable via potentiometer)
 int servoPos = 90;             // servo position
 int TestRuns = 0;              // counter used to limit total number of cycles to make data collection easier
 
@@ -53,7 +53,7 @@ void setup()
   Serial.println ("Tube should be level by now!");
   delay(5000);
   PIDinput = getBallPosition(); // initialize PID variable
-  PIDsetpoint = 24;             // set the target ball position (to-do: make adjustable via potentiometer)
+  PIDsetpoint = 30;             // set the target ball position (to-do: make adjustable via potentiometer)
   myPID.SetMode(AUTOMATIC);     // turn the PID on
 }
 
@@ -107,7 +107,7 @@ int decideMovement(){
 int decideMovementWithPID(){
   
   if (TestRuns == 0){
-    Serial.println("PID tunings: 7,.6,3");                                         //   <<< Change PID here 2/2 <<<<
+    Serial.println("PID tunings: 9,2,.5");                                         //   <<< Change PID here 2/2 <<<<
     Serial.println("PIDsetpoint BallPosition PIDoutput PIDoutputMapped");
   }  
   PIDinput = getBallPosition();
