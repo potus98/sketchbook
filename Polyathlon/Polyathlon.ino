@@ -55,7 +55,7 @@ int buttonState = 0;         // variable for reading the pushbutton status
 
 ////////////////////////////////////////////////////////////////////////
 // Prepare PID library
-#include <PID_v1.h>
+#include <PID_v1.h>   // include the PID library See: http://playground.arduino.cc/Code/PIDLibrary
 // Initialize variables related to PID
 double PIDsetpoint, PIDinput, PIDoutput;
 //PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,2,5,1, DIRECT);  //2,5,1 is the default example in the library
@@ -76,6 +76,21 @@ double PIDsetpoint, PIDinput, PIDoutput;
 //PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,.5,0, DIRECT);  // better at first, starts oscillating
 //PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,.1,0, DIRECT);  // a little better at first, then similar to previous
 PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,.05,0, DIRECT);  // best so far, last longest, does oscillate eventually
+
+// from br3ttb on arduino forums... Parameters and what they do (sort of)
+// P_Param: the bigger the number the harder the controller pushes.
+// I_Param: the SMALLER the number (except for 0, which turns it off,)  the more quickly the controller reacts to load changes, but the greater the risk of oscillations.
+// D_Param: the bigger the number the more the controller dampens oscillations (to the point where performance can be hindered)
+
+int PIDoutputMapped = 0;       // used when mapping PID output to safe servo range so servo doesn't twist demo rig apart
+int PIDoutputConstrained = 0;  // extra safety against sending servo to positions that might break the demo rig
+//const int pingPin = 7;         // defines signal pin used by ping sensor
+//int timeToPing = 0;            // used during ping sensor operation
+//int BallPosition = 0;          // calculated distance of ball from sensor
+//int setPoint = 30;             // hardcoded target point (to-do: make adjustable via potentiometer)
+//int servoPos = 90;             // servo position
+int TestRuns = 0;              // counter used to limit total number of cycles to make data collection easier
+
 
 // wheelie popping might be complicating? it's tiny, but it does happen occassionally
 
@@ -108,7 +123,7 @@ void setup()
   // initialize PID variables we're linked to
   PIDinput = qtra.readLine(sensorValues); // 
   PIDsetpoint = 3500;                     // attempt to stay centered over line
-  myPID.SetOutputLimits(-90,90);              // set output limits
+  //myPID.SetOutputLimits(-90,90);              // set output limits
   myPID.SetMode(AUTOMATIC);               // turn the PID on
 
   ////////////////////////////////////////////////////////////////////////
@@ -116,6 +131,7 @@ void setup()
   delay(500);
   int i;
   
+  Serial.println("Running calibration (see the blinky red light)?");
   for (i = 0; i < 200; i++)      // run calibration for a few seconds
   {
     digitalWrite(ledPin, HIGH);  // turn on LED (flicker LED during calibration)
@@ -142,7 +158,7 @@ void setup()
   Serial.println();
   delay(1000);
   ////////////////////////////////////////////////////////////////////////
-  // pause at end of setup to wait for button push
+  // call pause function at end of setup to wait for button push
   pause(); 
 } //end of void setup
 
@@ -154,10 +170,11 @@ void loop()
   //navigationSensorTest(); // display reflectance sensor array reading
   //navigationLogicA();     // has 3 conditions: straight, turn left, turn right
   //navigationLogicB();     // has 7 states with varying motor responses
-  navigationLogicC();       // uses PID library
+  ////navigationLogicC();       // uses PID library
   //navigationLogicD();     // lookup tables, basically
   //navigationLogicE();     // basic PID (non library) implementation
   //diagnosticDrive(5); 
+  PIDTestNoMotors();
 } //end of void loop
 
 ////////////////////////////////////////////////////////////////////////
@@ -712,3 +729,33 @@ int navigationLogicE(){
 //Serial.println("end of navigationLogicE function");
 //delay(300); // Remove this delay for final testing and actual competition
 }
+
+////////////////////////////////////////////////////////////////////////
+int PIDTestNoMotors(){
+  
+  if (TestRuns == 0){
+    Serial.println("PID tunings: x,y,z");                                         //   <<< Change PID here 2/2 <<<<
+    Serial.println("PIDsetpoint LinePosition PIDoutput PIDoutputMapped");
+  }  
+  PIDinput = qtra.readLine(sensorValues);
+  myPID.Compute();
+  PIDoutputMapped = map(PIDoutput, 0, 255, 0, 255);
+  PIDoutputConstrained = constrain (PIDoutputMapped, 0, 255); // constrain values so servo won't tear up the rig
+  //myservo.write(PIDoutputConstrained);
+  delay(25); // Provide time for screen scrolling
+  Serial.print(PIDsetpoint);
+  Serial.print(" ");
+  Serial.print(PIDinput);
+  Serial.print(" ");
+  Serial.print(PIDoutput);
+  Serial.print(" ");
+  Serial.println(PIDoutputMapped);
+  TestRuns++;
+  if ( TestRuns > 2000 ){
+    Serial.print(TestRuns);
+    Serial.println(" TestRuns complete. Pausing for 2 minutes...");
+    Serial.println(" ");
+    delay(120000);
+    TestRuns = 0;
+  }
+} // close PIDTestNoMotors function
