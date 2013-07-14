@@ -75,7 +75,10 @@ double PIDsetpoint, PIDinput, PIDoutput;
 //PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.015,0,0, DIRECT);  // drifty at first, then starts oscillating
 //PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,.5,0, DIRECT);  // better at first, starts oscillating
 //PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,.1,0, DIRECT);  // a little better at first, then similar to previous
-PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,.05,0, DIRECT);  // best so far, last longest, does oscillate eventually
+//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,.05,0, DIRECT);  // best so far, last longest, does oscillate eventually
+
+//resuming project on 7/11/2013 after PID Balance Beam project
+PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.1,0,0, DIRECT);
 
 // from br3ttb on arduino forums... Parameters and what they do (sort of)
 // P_Param: the bigger the number the harder the controller pushes.
@@ -90,8 +93,11 @@ int PIDoutputConstrained = 0;  // extra safety against sending servo to position
 //int setPoint = 30;             // hardcoded target point (to-do: make adjustable via potentiometer)
 //int servoPos = 90;             // servo position
 int TestRuns = 0;              // counter used to limit total number of cycles to make data collection easier
+int PIDoutputABS = 0;          // used when switching negatives to absolute values with abs() function
 
-
+int speedMotorA = 0;
+int speedMotorB = 0;
+  
 // wheelie popping might be complicating? it's tiny, but it does happen occassionally
 
 ////////////////////////////////////////////////////////////////////////
@@ -124,6 +130,7 @@ void setup()
   PIDinput = qtra.readLine(sensorValues); // 
   PIDsetpoint = 3500;                     // attempt to stay centered over line
   //myPID.SetOutputLimits(-90,90);              // set output limits
+  myPID.SetOutputLimits(-255,255);
   myPID.SetMode(AUTOMATIC);               // turn the PID on
 
   ////////////////////////////////////////////////////////////////////////
@@ -166,15 +173,16 @@ void setup()
 void loop()
 ////////////////////////////////////////////////////////////////////////
 {
-  Serial.println ("Starting void loop");
+  //Serial.println ("Starting void loop");
   //navigationSensorTest(); // display reflectance sensor array reading
   //navigationLogicA();     // has 3 conditions: straight, turn left, turn right
   //navigationLogicB();     // has 7 states with varying motor responses
   ////navigationLogicC();       // uses PID library
   //navigationLogicD();     // lookup tables, basically
   //navigationLogicE();     // basic PID (non library) implementation
+  navigationLogicF();     // uses PID library, after Balance Beam project
   //diagnosticDrive(5); 
-  PIDTestNoMotors();
+  //PIDTestNoMotors();
 } //end of void loop
 
 ////////////////////////////////////////////////////////////////////////
@@ -740,7 +748,7 @@ int PIDTestNoMotors(){
   PIDinput = qtra.readLine(sensorValues);
   myPID.Compute();
   PIDoutputMapped = map(PIDoutput, 0, 255, 0, 255);
-  PIDoutputConstrained = constrain (PIDoutputMapped, 0, 255); // constrain values so servo won't tear up the rig
+  //PIDoutputConstrained = constrain (PIDoutputMapped, 0, 255); // constrain values so servo won't tear up the rig
   //myservo.write(PIDoutputConstrained);
   delay(25); // Provide time for screen scrolling
   Serial.print(PIDsetpoint);
@@ -750,6 +758,108 @@ int PIDTestNoMotors(){
   Serial.print(PIDoutput);
   Serial.print(" ");
   Serial.println(PIDoutputMapped);
+  TestRuns++;
+  if ( TestRuns > 2000 ){
+    Serial.print(TestRuns);
+    Serial.println(" TestRuns complete. Pausing for 2 minutes...");
+    Serial.println(" ");
+    delay(120000);
+    TestRuns = 0;
+  }
+} // close PIDTestNoMotors function
+
+////////////////////////////////////////////////////////////////////////
+int navigationLogicF(){
+  
+  if (TestRuns == 0){
+    Serial.println("PID tunings: .1-0-0");                                         //   <<< Change PID here 2/2 <<<<
+    Serial.println("PIDsetpoint LinePosition PIDoutput speedMotorA speedMotorB");
+  }  
+  PIDinput = qtra.readLine(sensorValues);
+  myPID.Compute();
+  //PIDoutputMapped = map(PIDoutput, 0, 255, 0, 255);
+  delay(25); // Provide time for screen scrolling
+  Serial.print(PIDsetpoint);
+  Serial.print(",");
+  Serial.print(PIDinput);
+  Serial.print(",");
+  Serial.print(PIDoutput);
+  Serial.print(",");
+  //Serial.println(PIDoutputMapped);
+  
+  // Okay, so now that I have PIDoutput ranging from -255 to 255. How should I put it to use?
+  // -255 (position is >3500) = need to turn left, reduce power to MotorB/left.motor
+  // +255 (position is <3500) = need to turn right, reduce power to MotorA/right.motor
+  
+  // maybe there's a couple of ways to think about this. One, if a motor is on the good side of
+  // of the line, it should be full on and you shoud dial down the other motor to bring the bot
+  // back over the line. This is a subtract from full power method.
+  //
+  // But what if you thought about having a single pool of power to distribute between the two motors?
+  // What if the PIDoutput range (-255 to 255) was used to distribute the power pool across both motors?
+  // At PIDoutput 0, both motors would receive an equal amount of power. At PIDoutput 128, one motor
+  // would recieve 75% of the power while the other would receive 25%. This wouldn't necessarily need
+  // to be linear, it could be a curve that softens adjustments near center, but becomes stronger
+  // when far off center. This is an allocate from a single power pool method.
+  // This might allow us to separate speed from steering. You could calculate the power allocation first,
+  // then apply a speed setting to amplify the value before setting the motor speeds.
+  // 
+  
+  // assume position 3400 - 3600 is dead zone or sweet spot (implement later?)
+  // assume forward operating range of motors is min=50 to max=150.
+  //
+  // if the PIDoutput is negative, need to turn left
+  //   - Set MotorA/right.motor to max
+  //   - Set MotorB/left.motor to map of -255/0 to min/max
+  // if the PIDoutput is positive, need to turn right
+  //   - Set MotorA/right.motor to map ot 0/255 to min/max
+  //   - Set MotorB/left.motor to max
+
+  if ( PIDoutput < 0 ){
+    PIDoutputABS=abs(PIDoutput); // convert to absolute value
+    speedMotorA = 150;
+    //speedMotorA = speedMotorA * .93; // compensate for tested out of of tolerance
+    speedMotorB = map(PIDoutputABS, 255, 0, 50, 150);
+    Serial.print(speedMotorA);
+    Serial.print(",");
+    Serial.print(speedMotorB);
+    //leftMotor.move(forward, speedMotorA);
+    //rightMotor.move(forward, speedMotorB);
+  }
+  
+    if ( PIDoutput > 0 ){
+    speedMotorB = 150;
+    speedMotorA = map(PIDoutput, 255, 0, 50, 150);
+    //speedMotorA = speedMotorA * .93; // compensate for tested out of of tolerance
+    Serial.print(speedMotorA);
+    Serial.print(",");
+    Serial.print(speedMotorB);
+    //leftMotor.move(forward, speedMotorA);
+    //rightMotor.move(forward, speedMotorB);
+  }
+
+  /*
+  if (position >= 3500){             // need to vere left, reduce power to MotorB/left.motor
+    Serial.println("    vere Left");
+    speedMotorA = 150 - correctionAmount;
+    speedMotorA = speedMotorA * .93;
+    speedMotorB = 150;
+    leftMotor.move(forward, speedMotorA);
+    rightMotor.move(forward, speedMotorB);
+  }
+
+  if (position < 3500){             // need to vere right, reduce power to MotorA/right.motor
+    Serial.println("    vere Right");
+    speedMotorA = 150;
+    speedMotorA = speedMotorA * .93;
+    speedMotorB = 150 - correctionAmount;
+    leftMotor.move(forward, speedMotorA);
+    rightMotor.move(forward, speedMotorB);
+  } 
+  */
+
+  Serial.println(" ");
+  
   TestRuns++;
   if ( TestRuns > 2000 ){
     Serial.print(TestRuns);
