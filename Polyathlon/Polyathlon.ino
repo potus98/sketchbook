@@ -78,7 +78,7 @@ double PIDsetpoint, PIDinput, PIDoutput;
 //PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,.05,0, DIRECT);  // best so far, last longest, does oscillate eventually
 
 //resuming project on 7/11/2013 after PID Balance Beam project
-PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.1,0,0, DIRECT);
+PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.2,0,.05, DIRECT);
 
 // from br3ttb on arduino forums... Parameters and what they do (sort of)
 // P_Param: the bigger the number the harder the controller pushes.
@@ -772,9 +772,10 @@ int PIDTestNoMotors(){
 int navigationLogicF(){
   
   if (TestRuns == 0){
-    Serial.println("PID tunings: .1-0-0");                                         //   <<< Change PID here 2/2 <<<<
+    Serial.println("PID tunings: .2-0-.05");                                         //   <<< Change PID here 2/2 <<<<
     Serial.println("PIDsetpoint LinePosition PIDoutput speedMotorA speedMotorB");
   }  
+  
   PIDinput = qtra.readLine(sensorValues);
   myPID.Compute();
   //PIDoutputMapped = map(PIDoutput, 0, 255, 0, 255);
@@ -814,28 +815,32 @@ int navigationLogicF(){
   // if the PIDoutput is positive, need to turn right
   //   - Set MotorA/right.motor to map ot 0/255 to min/max
   //   - Set MotorB/left.motor to max
-
+  
+  // ***Testing revealed flipped behavior..? So, exchaning B's and A's...
+  
   if ( PIDoutput < 0 ){
     PIDoutputABS=abs(PIDoutput); // convert to absolute value
-    speedMotorA = 150;
-    //speedMotorA = speedMotorA * .93; // compensate for tested out of of tolerance
-    speedMotorB = map(PIDoutputABS, 255, 0, 50, 150);
+    speedMotorB = 160;
+    //speedMotorA? = speedMotorA * .93; // compensate for tested out of of tolerance
+    speedMotorA = map(PIDoutputABS, 255, 0, 50, 160);
     Serial.print(speedMotorA);
     Serial.print(",");
     Serial.print(speedMotorB);
-    //leftMotor.move(forward, speedMotorA);
-    //rightMotor.move(forward, speedMotorB);
+    speedMotorB = speedMotorB * .93;
+    leftMotor.move(forward, speedMotorA);
+    rightMotor.move(forward, speedMotorB);
   }
   
     if ( PIDoutput > 0 ){
-    speedMotorB = 150;
-    speedMotorA = map(PIDoutput, 255, 0, 50, 150);
-    //speedMotorA = speedMotorA * .93; // compensate for tested out of of tolerance
+    speedMotorA = 160;
+    speedMotorB = map(PIDoutput, 255, 0, 50, 160);
+    //speedMotorA? = speedMotorA * .93; // compensate for tested out of of tolerance
     Serial.print(speedMotorA);
     Serial.print(",");
     Serial.print(speedMotorB);
-    //leftMotor.move(forward, speedMotorA);
-    //rightMotor.move(forward, speedMotorB);
+    speedMotorB = speedMotorB * .93;
+    leftMotor.move(forward, speedMotorA);
+    rightMotor.move(forward, speedMotorB);
   }
 
   /*
@@ -857,15 +862,34 @@ int navigationLogicF(){
     rightMotor.move(forward, speedMotorB);
   } 
   */
+  
+  if (sensorValues[0] > 700 && sensorValues[1] > 700 && sensorValues[2] > 700 && sensorValues[3] > 700 && sensorValues[4] > 700 && sensorValues[5] > 700 && sensorValues[6] > 700 && sensorValues[7] > 700)
+  {
+    Serial.println(" ");
+    Serial.println(" Whoa! Everything looks black!");
+    allStop();
+    pause();
+  }
+  // if all eight sensors see very high reflectance (white), take some appropriate action for this situation
+  // might need to revisit hardcoding 80. should consider deriving from min/max during calibration sequence
+  if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80)
+  {
+    Serial.println(" ");
+    Serial.println(" Whoa! Everything looks white!");
+    //allStop();
+    //pause();
+    // I've lost the line. Just drop through assuming the last reading will get us back on track.
+  }  
 
   Serial.println(" ");
   
   TestRuns++;
   if ( TestRuns > 2000 ){
+    allStop(); 
     Serial.print(TestRuns);
     Serial.println(" TestRuns complete. Pausing for 2 minutes...");
     Serial.println(" ");
-    delay(120000);
+    pause();
     TestRuns = 0;
   }
 } // close PIDTestNoMotors function
