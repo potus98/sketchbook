@@ -59,25 +59,6 @@ int var = 0;                 // variable for short loops
 #include <PID_v1.h>   // include the PID library See: http://playground.arduino.cc/Code/PIDLibrary
 // Initialize variables related to PID
 double PIDsetpoint, PIDinput, PIDoutput;
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,2,5,1, DIRECT);  //2,5,1 is the default example in the library
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.1,0,0, DIRECT);  // works okay, or at least makes sense
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.025,0,0, DIRECT);  // works at first, then oscilates more and more
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.025,0,.1, DIRECT);  // oscilates sooner than prior
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.025,.1,0, DIRECT);  // better than previous, oscilates later
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.025,.05,.05, DIRECT);  // step backward
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.025,.025,0, DIRECT);  // good straight, once oscilates, falls apart fast.
-                                                                     // oscilation due to go straight related to differing motor strength?
-// added .93 motor power correction for motorA, repeating tests...
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.025,0,0, DIRECT);  // softer, farthest straight so far, but still ends in oscilation
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.075,0,0, DIRECT);  // increasing oscillation
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.5,0,0, DIRECT);  // increasing oscillation sooner than previous
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.025,.5,0, DIRECT);  // oscillation similar, harder
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,0,0, DIRECT);  // soft drifty, loses line, but re-finds smoothly if slowly
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.015,0,0, DIRECT);  // drifty at first, then starts oscillating
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,.5,0, DIRECT);  // better at first, starts oscillating
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,.1,0, DIRECT);  // a little better at first, then similar to previous
-//PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.01,.05,0, DIRECT);  // best so far, last longest, does oscillate eventually
-
 //resuming project on 7/11/2013 after PID Balance Beam project
 PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.2,0,.05, DIRECT);
 
@@ -241,15 +222,6 @@ int driveForward(int speedMotorA, int speedMotorB){
   rightMotor.move(forward, speedMotorB);
 }
 
-/*
-int driveForwardFake(int speedMotorA, int speedMotorB){  // fake driveForward for testing
-  Serial.print("driveForwardFake function: ");
-  Serial.print(speedMotorA);
-  Serial.print(" ");
-  Serial.print(speedMotorB);
-}
-*/
-
 int driveBackward(int speedMotorA, int speedMotorB){
   // function accepts two args: speed for motorA, motorB
   // future args may include specific time to run
@@ -257,76 +229,6 @@ int driveBackward(int speedMotorA, int speedMotorB){
   leftMotor.move(backward, speedMotorA);
   rightMotor.move(backward, speedMotorB);
 }
-
-/*
-int pivotCounterClockwise(int speedMotor, int pivotTime){
-  // function accepts two args: speed for motors and time to run
-  // pivots counter clockwise
-  // speedMotor adjusts how fast to pivot. >100 good to overcome standing resistance
-  // pivotTime adjusts how long to pivot
-  //
-  // Based on tests with reasonably new batteries
-  // 180 - 210 degrees = 110,1000
-  //  40 -  80 degrees = 110, 400
-  //  50 - 110 degrees = 100, 500
-  // Bleh! Trying to use power and timing to perform semi-accurate turns doesn't seem feasible
-  // with current setup. The resulting degrees of turn vary wildly. Will need to access the
-  // wheel encoder information to make useful pivots.
-  //
-  int speedMotorA = speedMotor;
-  int speedMotorB = speedMotor;
-  Serial.print("pivotCounterClockwise function: ");
-  Serial.print(speedMotorA);
-  Serial.print(" ");
-  Serial.print(speedMotorB);
-  Serial.print(" Time: ");
-  Serial.println(pivotTime);
-  digitalWrite(dir_a, LOW);
-  digitalWrite(dir_b, HIGH);
-  analogWrite(pwm_a, speedMotorA);
-  analogWrite(pwm_b, speedMotorB);
-  delay(pivotTime);
-}
-*/
-
-/*
-int pivotClockwise(int speedMotor, int pivotTime){
-  // function accepts two args: speed for motors and time to run
-  // pivots counter clockwise
-  // speedMotor adjusts how fast to pivot. >100 good to overcome standing resistance
-  // pivotTime adjusts how long to pivot
-  //
-  // Based on tests with reasonably new batteries
-  // 180 - 210 degrees = 110,1000
-  //  40 -  80 degrees = 110, 400
-  //  50 - 110 degrees = 100, 500
-  // Bleh! Trying to use power and timing to perform semi-accurate turns doesn't seem feasible
-  // with current setup. The resulting degrees of turn vary wildly. Will need to access the
-  // wheel encoder information to make useful pivots.
-  //
-  int speedMotorA = speedMotor;
-  int speedMotorB = speedMotor;
-  Serial.print("pivotClockwise function: ");
-  Serial.print(speedMotorA);
-  Serial.print(" ");
-  Serial.print(speedMotorB);
-  Serial.print(" Time: ");
-  Serial.println(pivotTime);
-  digitalWrite(dir_a, HIGH);
-  digitalWrite(dir_b, LOW);
-  analogWrite(pwm_a, speedMotorA);
-  analogWrite(pwm_b, speedMotorB);
-  delay(pivotTime);
-}
-*/
-
-/*
-int setDirection(int positionToCheck){
-  // function accepts the position value which should be between 1 and 6999 then
-  // evaluate the position value and adjust motorA/B speeds to stay on course.
-  // 
-}
-*/
 
 int diagnosticDrive(int secondsToDrive){
   // drive forward for secondsToDrvie seconds
@@ -337,407 +239,6 @@ int diagnosticDrive(int secondsToDrive){
   delay(50000);
 }
 
-/* 
-int BackupTurnFunction(){
-  // This is a basic, pre-defined backup and turn routine. You could call this
-  // when, say, a forward facing ping sensor detects an object in the bot's path
-  digitalWrite(dir_a, HIGH);  // Set motor direction, 1 low, 2 high
-  digitalWrite(dir_b, HIGH);  // Set motor direction, 3 high, 4 low
-  analogWrite(pwm_a, 150);    //
-  analogWrite(pwm_b, 75);     // running motors at different speed results in backup turn
-  delay (3000);               // give the motor controller and motors a moment to come to a stop
-  analogWrite(pwm_a, 0);      //
-  analogWrite(pwm_b, 0);      //
-  delay (2000);               // set both motors to off for a moment
-  return 0;                   // may use return values in the future, but for now,
-                              // this value is not used
-}
-*/
-
-////////////////////////////////////////////////////////////////////////
-int navigationSensorTest(){
-////////////////////////////////////////////////////////////////////////
-  // 
-  // Show sensor readings
-  //
-  // read calibrated sensor values and obtain a measure of the line position from 0 to 7000.
-  unsigned int position = qtra.readLine(sensorValues);
-  unsigned char i;
-  for (i = 0; i < NUM_SENSORS; i++)
-  {
-    Serial.print(sensorValues[i] * 10 / 1001);
-    Serial.print(' ');
-  }
-  Serial.print("  ");
-  Serial.print(position);
-  Serial.print("  ");
-  delay(200); // Adjust for readability in Serial console
-  unsigned int sensors[8];
-  if (sensorValues[0] > 750 && sensorValues[1] > 750 && sensorValues[2] > 750 && sensorValues[3] > 750 && sensorValues[4] > 750 && sensorValues[5] > 750 && sensorValues[6] > 750 && sensorValues[7] > 750)
-  {
-    Serial.println(" Whoa! Everything looks black!");
-  }
-  if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80)
-  {
-    Serial.println(" Whoa! Everything looks white!");
-  } 
-  
-  // CHECK for a 90 degree intersection
-  //
-  
-  
-  // By this point, we're assuming no 90 degree intersection or 90 degree turns
-  //
-  // Determine drive action based on line position value between 0 and 7000.
-  // This logic assumes a single line. No provision for intersections at this time.
-  if (position >= 0 && position < 1000){
-    Serial.println("          Right Strong");
-    driveForward(90, 55);
-  }
-  else if (position >= 1000 && position < 2000){
-    Serial.println("          Right Moderate");
-    driveForward(90, 75);
-  }
-  else if (position >= 2000 && position < 3000){
-    Serial.println("          Right Slight");
-    driveForward(100, 85);
-  }
-  else if (position >= 3000 && position < 4000){
-    Serial.println("          Straight Ahead");
-    driveForward(100, 100);
-  }
-  else if (position >= 4000 && position < 5000){
-    Serial.println("          Left Slight");
-    driveForward(85, 100);
-  }
-  else if (position >= 5000 && position < 6000){
-    Serial.println("          Left Moderate");
-    driveForward(75, 90);
-  }
-  else if (position >= 6000 && position <= 7000){
-    Serial.println("          Left Strong");
-    driveForward(55, 90);
-  }
-}
-
-
-////////////////////////////////////////////////////////////////////////
-// int navigationLogicA(){ See LineFollower_v13 }
-////////////////////////////////////////////////////////////////////////
-// int navigationLogicB(){ See LineFollower_v13 }
-////////////////////////////////////////////////////////////////////////
-
-
-////////////////////////////////////////////////////////////////////////
-int navigationLogicC(){
-////////////////////////////////////////////////////////////////////////
-  // Actual PID
-  //
-  int speedMotorA = 255;
-  int speedMotorB = 255;
-  // read calibrated sensor values and obtain a measure of the line position from 0 to 7000.
-  unsigned int position = qtra.readLine(sensorValues);
-  unsigned char i;
-  for (i = 0; i < NUM_SENSORS; i++)
-  {
-    Serial.print(sensorValues[i] * 10 / 1001);
-    Serial.print(' ');
-  }
-  Serial.print("  ");
-  Serial.print(position);
-  Serial.print("  ");
-  //delay(250); // Might consider removing this delay for actual competition
-  ////////////////////////////////////////////////////////////////////////
-  unsigned int sensors[8];
-  // if all eight sensors see very low reflectance (black), take some appropriate action for this situation
-  // might need to revisit hardcoding 750. should consider deriving from min/max during calibration sequence
-  if (sensorValues[0] > 750 && sensorValues[1] > 750 && sensorValues[2] > 750 && sensorValues[3] > 750 && sensorValues[4] > 750 && sensorValues[5] > 750 && sensorValues[6] > 750 && sensorValues[7] > 750)
-  {
-    Serial.println(" Whoa! Everything looks black!");
-    allStop();
-    //delay(3000);
-    // do something.  Maybe this means we're at the edge of a course or about to fall off a table,
-    // in which case, we might want to stop moving, back up, and turn around.
-    //return;
-  }
-  // if all eight sensors see very high reflectance (white), take some appropriate action for this situation
-  // might need to revisit hardcoding 80. should consider deriving from min/max during calibration sequence
-  if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80)
-  {
-    Serial.println(" Whoa! Everything looks white!");
-    allStop();
-    // do something.  Maybe this means we're at the edge of a course or about to fall off a table,
-    // in which case, we might want to stop moving, back up, and turn around.
-    //return;
-  } 
-  // Determine drive action based on line position value between 0 and 7000.
-  // This logic assumes a single line. No provision for intersections at this time.
-  
-  PIDinput = qtra.readLine(sensorValues);
-  myPID.Compute();
-  Serial.print("PIDoutput: ");
-  Serial.println(PIDoutput);
-  
-  // Okay, so now that I have PIDoutput ranging from -255 to 255. How should I put it to use?
-  // -255 (position is >3500) = need to turn left, reduce power to MotorB/left.motor
-  // +255 (position is <3500) = need to turn right, reduce power to MotorA/right.motor
-  
-  // I don't really need the negative number, I just need to konw relative distance from setpoint of 3500
-  int correctionAmount = abs(PIDoutput);
-  
-  if (position >= 3500){             // need to vere left, reduce power to MotorB/left.motor
-    Serial.println("    vere Left");
-    speedMotorA = 150 - correctionAmount;
-    speedMotorA = speedMotorA * .93;
-    speedMotorB = 150;
-    leftMotor.move(forward, speedMotorA);
-    rightMotor.move(forward, speedMotorB);
-  }
-
-  if (position < 3500){             // need to vere right, reduce power to MotorA/right.motor
-    Serial.println("    vere Right");
-    speedMotorA = 150;
-    speedMotorA = speedMotorA * .93;
-    speedMotorB = 150 - correctionAmount;
-    leftMotor.move(forward, speedMotorA);
-    rightMotor.move(forward, speedMotorB);
-  } 
-}
-
-
-
-////////////////////////////////////////////////////////////////////////
-int navigationLogicD(){
-////////////////////////////////////////////////////////////////////////
-Serial.println("Enterting navigationLogicD function");
-  // Sort-of a poor man's PID
-  //
-  // Derived from navigationLogicB but adding 90 degree intersection and 90 degree turn handling
-  //
-  // read calibrated sensor values and obtain a measure of the line position from 0 to 7000.
-  unsigned int position = qtra.readLine(sensorValues);
-  unsigned char i;
-  for (i = 0; i < NUM_SENSORS; i++)
-  {
-    Serial.print(sensorValues[i] * 10 / 1001);
-    Serial.print(' ');
-  }
-  Serial.print("  ");
-  Serial.print(position);
-  Serial.println("  ");
-  ////////////////////////////////////////////////////////////////////////
-  unsigned int sensors[8];
-  // get calibrated sensor values returned in the sensors array, along with the line position
-  // position will range from 0 to 7000, with 3000 corresponding to the line over sensor 4
-  // Will be treating sensor 4 (array position 5) as middle sensor
-  //int position = qtr.readLine(sensors);
-  // if all eight sensors see very low reflectance (black), take some appropriate action for this situation
-  // might need to revisit hardcoding 750. should consider deriving from min/max during calibration sequence
-  
-  // CHECK for all black (all sensors very low reflectance) won't need for line following loop course.
-  if (sensorValues[0] > 750 && sensorValues[1] > 750 && sensorValues[2] > 750 && sensorValues[3] > 750 && sensorValues[4] > 750 && sensorValues[5] > 750 && sensorValues[6] > 750 && sensorValues[7] > 750)
-  {
-    Serial.println("    DETECTED: All Black");
-  }
-  if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80)
-  {
-    Serial.println("    DETECTED: All White");
-  }
-  
-  /*
-  // CHECK for a 90 degree intersection (all sensors low reflectance) a more relaxed version of all black check
-  if (sensorValues[0] > 400 && sensorValues[1] > 400 && sensorValues[2] > 400 && sensorValues[3] > 400 && sensorValues[4] > 400 && sensorValues[5] > 400 && sensorValues[6] > 400 && sensorValues[7] > 400)
-  {
-    Serial.print("    DETECTED: 90 degree intersection");
-    // keep going straight
-    driveForward(100,100);
-    delay(100); // drive forward 1/10 second
-
-  }
-
-  // CHECK for a 90 degree LEFT
-  if (sensorValues[0] > 400 && sensorValues[1] > 400 && sensorValues[2] > 400 && sensorValues[3] > 400)
-  {
-    Serial.print("    DETECTED: 90 degree Left");
-    // perform 90 degree left turn  
-  }
-
-  // CHECK for a 90 degree RIGHT
-  if (sensorValues[4] > 400 && sensorValues[5] > 400 && sensorValues[6] > 400 && sensorValues[7] > 400)
-  {
-    Serial.print("    DETECTED: 90 degree Right");
-  }
-  */
-  
-  // By this point, we're assuming no 90 degree intersection or 90 degree turns
-  //
-  // Determine drive action based on line position value between 0 and 7000.
-  // This logic assumes a single line. No provision for intersections at this time.
-  if (position == 0){
-    Serial.println("    Left Pivot");
-    //pivotCounterClockwise(80,0);  // Seems to pivot too fast.
-    driveForward(75, 0);            // Try pivot on left wheel instead of center of vehicle.
-  }
-  else if (position > 0 && position < 500){
-    driveForward(80, 55);
-  }
-  else if (position >= 500 && position < 1000){
-    driveForward(90, 60);
-  }
-  else if (position >= 1000 && position < 1500){
-    driveForward(90, 65);
-  }
-  else if (position >= 1500 && position < 2000){
-    driveForward(100, 75);
-  }
-  else if (position >= 2000 && position < 2500){
-    driveForward(100, 80);
-  }
-  else if (position >= 2500 && position < 3000){
-    driveForward(100, 90);
-  }
-  else if (position >= 3000 && position < 3500){
-    driveForward(100, 100);
-  }
-  else if (position >= 3500 && position < 4000){
-    driveForward(100, 100);
-  }
-  else if (position >= 4000 && position < 4500){
-    driveForward(90, 100);
-  }
-  else if (position >= 4500 && position < 5000){
-    driveForward(80, 100);
-  }
-  else if (position >= 5000 && position < 5500){
-    driveForward(75, 100);
-  }
-  else if (position >= 5500 && position < 6000){
-    driveForward(65, 90);
-  }
-  else if (position >= 6000 && position < 6500){
-    driveForward(60, 90);
-  }
-  else if (position >= 6500 && position < 7000){
-    driveForward(55, 80);
-  }
-  else if (position >= 7000){
-    Serial.println("    Right Pivot ");
-    //pivotClockwise(80,0);        // Seems to pivot too fast.
-    driveForward(0,75);            // Try pivot on left wheel instead of center of vehicle.
-  }
-Serial.println("end of navigationLogicD function");
-//delay(500); // Remove this delay for final testing and actual competition
-}
-
-////////////////////////////////////////////////////////////////////////
-int navigationLogicE(){
-////////////////////////////////////////////////////////////////////////
-//Serial.println("Enterting navigationLogicE function");
-  // Attempting an actual PID like implementation based on
-  // http://www.scribd.com/doc/49813253/Building-Autonomous-Line-Followers-using-Arduino-and-PID
-  //
-  //
-  // read calibrated sensor values and obtain a measure of the line position from 0 to 7000.
-  unsigned int position = qtra.readLine(sensorValues);
-  unsigned char i;
-  for (i = 0; i < NUM_SENSORS; i++)
-  {
-    Serial.print(sensorValues[i] * 10 / 1001);
-    Serial.print(' ');
-  }
-  Serial.print("  ");
-  Serial.print(position);
-  Serial.println("  ");
-  ////////////////////////////////////////////////////////////////////////
-  unsigned int sensors[8];  // not sure why this is here.
-  
-  // set point should be 3500. This is the target value of "position". The target this algorithm is trying to achieve.
-  int setPoint = 3500;
-  int Kp = .1;
-  int Ki = 1;
-  int Kd = 1;
-  int proportional = 3500;
-  int integral = 1;
-  int derivative = 1;
-  int lastProportional = 1;
-  int errorValue = 1;
-  
-  // Calculate PID
-  proportional = position - setPoint;
-  integral = integral + proportional;
-  derivative = proportional - lastProportional;
-  lastProportional = proportional;
-  errorValue = int(proportional * Kp + integral * Ki + derivative * Kd);
-  
-  Serial.print("                    proportional: ");
-  Serial.print(proportional);
-  Serial.print(" integral: ");
-  Serial.print(integral);
-  Serial.print(" derivative: ");
-  Serial.print(derivative);
-  Serial.print(" lastProportional: ");
-  Serial.print(lastProportional);
-  Serial.print(" errorValue: ");
-  Serial.println(errorValue);
-
-  // might need to revisit hardcoding 750. should consider deriving from min/max during calibration sequence
-  // CHECK for all black (all sensors very low reflectance) won't need for line following loop course.
-  if (sensorValues[0] > 750 && sensorValues[1] > 750 && sensorValues[2] > 750 && sensorValues[3] > 750 && sensorValues[4] > 750 && sensorValues[5] > 750 && sensorValues[6] > 750 && sensorValues[7] > 750)
-  {
-    Serial.println("    DETECTED: All Black");
-  }
-  if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80)
-  {
-    Serial.println("    DETECTED: All White");
-  }
-  
-  /*
-  removed dedicated 90 degree intersection, 90 degree left, and 90 degree right checks
-  */
-  
-  // Determine drive action based on line position value between 0 and 7000.
-  // This logic assumes a single line. No provision for intersections at this time.
-  
-  // Following is a John hack. Very simple P implementation assuming full motor speed is 100.
-  // Take the proportional value (position - setPoint) which will range from -3500 to 3500 and
-  // multiply by .1 to convert, say, 3500 to 35, then multiply by 2
-  // Subtract the resulting value from max speed of motor.
-  
-  if (proportional < 0)
-  {
-    Serial.println("                    proportional is less than 0");
-    // Turn left
-    proportional = abs(proportional);
-    Serial.print("abs of proportional is: ");
-    Serial.println(proportional);
-    proportional = ((proportional * .01) *2);
-    Serial.print("adjusted proportional is: ");
-    Serial.println(proportional);
-    proportional = (100 - proportional);
-    Serial.print("adjusted speed is: ");
-    Serial.println(proportional);
-    driveForward(100, proportional);
-  }
-  
-  if (proportional > 0)
-  {
-    Serial.println("                    proportional is less than 0");
-    // Turn right
-    proportional = abs(proportional);
-    Serial.print("abs of proportional is: ");
-    Serial.println(proportional);
-    proportional = ((proportional * .01) *2);
-    Serial.print("adjusted proportional is: ");
-    Serial.println(proportional);
-    proportional = (100 - proportional);
-    Serial.print("adjusted speed is: ");
-    Serial.println(proportional);
-    driveForward(proportional, 100);
-  }
-
-//Serial.println("end of navigationLogicE function");
-//delay(300); // Remove this delay for final testing and actual competition
-}
 
 ////////////////////////////////////////////////////////////////////////
 int PIDTestNoMotors(){
@@ -769,8 +270,9 @@ int PIDTestNoMotors(){
   }
 } // close PIDTestNoMotors function
 
-////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int navigationLogicF(){
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   
   if (TestRuns == 0){
     Serial.println("PID tunings: .2-0-.05");                                         //   <<< Change PID here 2/2 <<<<
@@ -779,7 +281,6 @@ int navigationLogicF(){
   
   PIDinput = qtra.readLine(sensorValues);
   myPID.Compute();
-  //PIDoutputMapped = map(PIDoutput, 0, 255, 0, 255);
   //delay(25); // Provide time for screen scrolling
   Serial.print(PIDsetpoint);
   Serial.print(",");
@@ -789,41 +290,21 @@ int navigationLogicF(){
   Serial.print(",");
   //Serial.println(PIDoutputMapped);
   
-  // Okay, so now that I have PIDoutput ranging from -255 to 255. How should I put it to use?
-  // -255 (position is >3500) = need to turn left, reduce power to MotorB/left.motor
-  // +255 (position is <3500) = need to turn right, reduce power to MotorA/right.motor
-  
-  // maybe there's a couple of ways to think about this. One, if a motor is on the good side of
-  // of the line, it should be full on and you shoud dial down the other motor to bring the bot
-  // back over the line. This is a subtract from full power method.
-  //
-  // But what if you thought about having a single pool of power to distribute between the two motors?
-  // What if the PIDoutput range (-255 to 255) was used to distribute the power pool across both motors?
-  // At PIDoutput 0, both motors would receive an equal amount of power. At PIDoutput 128, one motor
-  // would recieve 75% of the power while the other would receive 25%. This wouldn't necessarily need
-  // to be linear, it could be a curve that softens adjustments near center, but becomes stronger
-  // when far off center. This is an allocate from a single power pool method.
-  // This might allow us to separate speed from steering. You could calculate the power allocation first,
-  // then apply a speed setting to amplify the value before setting the motor speeds.
-  // 
-  
-  // assume position 3400 - 3600 is dead zone or sweet spot (implement later?)
-  // assume forward operating range of motors is min=50 to max=150.
-  //
-  // if the PIDoutput is negative, need to turn left
-  //   - Set MotorA/right.motor to max
-  //   - Set MotorB/left.motor to map of -255/0 to min/max
-  // if the PIDoutput is positive, need to turn right
-  //   - Set MotorA/right.motor to map ot 0/255 to min/max
-  //   - Set MotorB/left.motor to max
-  
-  // ***Testing revealed flipped behavior..? So, exchaning B's and A's...
   
   if ( PIDoutput < 0 ){
     PIDoutputABS=abs(PIDoutput); // convert to absolute value
     speedMotorB = 200;
-    //speedMotorA? = speedMotorA * .93; // compensate for tested out of of tolerance
-    speedMotorA = map(PIDoutputABS, 255, 0, 50, 200); // 50,160 worked well
+    speedMotorA = map(PIDoutputABS, 255, 0, 50, 200);
+    Serial.print(speedMotorA);
+    Serial.print(",");
+    Serial.print(speedMotorB);
+    speedMotorB = speedMotorB * .93;
+    leftMotor.move(forward, speedMotorA);
+    rightMotor.move(forward, speedMotorB);
+  }
+    if ( PIDoutput > 0 ){
+    speedMotorA = 200;
+    speedMotorB = map(PIDoutput, 255, 0, 50, 200);
     Serial.print(speedMotorA);
     Serial.print(",");
     Serial.print(speedMotorB);
@@ -832,17 +313,14 @@ int navigationLogicF(){
     rightMotor.move(forward, speedMotorB);
   }
   
-    if ( PIDoutput > 0 ){
-    speedMotorA = 200;
-    speedMotorB = map(PIDoutput, 255, 0, 50, 200);
-    //speedMotorA? = speedMotorA * .93; // compensate for tested out of of tolerance
-    Serial.print(speedMotorA);
-    Serial.print(",");
-    Serial.print(speedMotorB);
-    speedMotorB = speedMotorB * .93;
-    leftMotor.move(forward, speedMotorA);
-    rightMotor.move(forward, speedMotorB);
+/*  
+  // Checking for need of advanced navigation
+  if (sensorValues[0] > 700 | sensorValues[7] > 700){  // If one of the outside sensors detects black, go into advanced navigation mode
+    // proceed straight until all white or 2" -whichever comes first
+    // if 2"     
+    
   }
+*/
 
   // check for all black
   if (sensorValues[0] > 700 && sensorValues[1] > 700 && sensorValues[2] > 700 && sensorValues[3] > 700 && sensorValues[4] > 700 && sensorValues[5] > 700 && sensorValues[6] > 700 && sensorValues[7] > 700)
@@ -851,7 +329,7 @@ int navigationLogicF(){
     Serial.println(" Whoa! Everything looks black!");
     // assume an intersection and proceed for a brief moment. If still all black, stop.
     var=0;
-    while(var < 50){
+    while(var < 150){
       Serial.println("going forward on black");
       var++;
     }
@@ -859,28 +337,14 @@ int navigationLogicF(){
 
   // check for sharp right
   if (sensorValues[0] > 700 && sensorValues[1] > 700) {
-    /*
-    Serial.println("sharp turn noticed, keep going until all white"); // ??? But cross intersections trip this !!!
-    // ? push ahead until all sensors white THEN rotate ?
-    // rotate right until PIDinput is 3000 then resume PID
-    while (sensorValues[0] > 700 | sensorValues[1] > 700 | sensorValues[2] > 700 | sensorValues[3] > 700 | sensorValues[4] > 700 | sensorValues[5] > 700 | sensorValues[6] > 700 | sensorValues[7] > 700){
-      Serial.println("Going until all white");
-      speedMotorA = 120;
-      // ??? .93 here ???
-      speedMotorB = 120;
-      leftMotor.move(forward, speedMotorA);
-      rightMotor.move(forward, speedMotorB);
-      PIDinput = qtra.readLine(sensorValues);
-    }
-    */
     // if this is an intersection, we'll end up on the other side and resume PID
-    // if this is a hard right or switchback, the all white turn right pivot should get us back on track
-    Serial.println("sharp turn noticed, punch through a little");
+    // if this is a hard right or switchback, the right pivot should get us back on track (or exit quickly if on a good line)
+    Serial.println("sharp turn noticed, punch through until white");
     var=0;
-    while(var < 30){  // punch through of 20 too low if battery is low and bot is really slow.
-      Serial.println("punch");
-      speedMotorA = 120;
-      speedMotorB = 120;
+    //while(var < 500){  // punch through of 20 too low if battery is low and bot is really slow.
+    while (sensorValues[0] > 700 | sensorValues[1] > 700 | sensorValues[2] > 700 | sensorValues[3] > 700 | sensorValues[4] > 700 | sensorValues[5] > 700 | sensorValues[6] > 700 | sensorValues[7] > 700){      Serial.println("punch");
+      speedMotorA = 125;
+      speedMotorB = 125;
       speedMotorB = speedMotorB * .93;
       leftMotor.move(forward, speedMotorA);
       rightMotor.move(forward, speedMotorB);
@@ -889,57 +353,42 @@ int navigationLogicF(){
       //                                        switchback corner under left sensors might be the last
       //                                        sensor read causing all white recovery to rotate
       //                                        in the wrong direction.
+      qtra.readLine(sensorValues);  //read sensors here to update array
       PIDinput = 0; // seed PIDouput so all white will result in right turn      
       var++;
     }
-    
-    
-    /* This chunk not needed since we're populating PIDinput in previous block. All white check will handle this corrective turn.
-    while ( PIDinput < 3500 ) {
-      Serial.println(" ");
-      Serial.println("Rotating Right");
-      speedMotorA = 120;
-      speedMotorB = 120;
+    var=0;
+    while(var < 150){
+      Serial.println("punch a little more to fully clear the line");
+      speedMotorA = 125;
+      speedMotorB = 125;
+      speedMotorB = speedMotorB * .93;
+      leftMotor.move(forward, speedMotorA);
+      rightMotor.move(forward, speedMotorB);
+      var++;
+    }
+
+    // after punch through, start rotating right
+    while ( PIDinput < 3500 ){
+      speedMotorA = 150; // 120 worked well
+      speedMotorB = 150;
       leftMotor.move(forward, speedMotorA);
       rightMotor.move(backward, speedMotorB);
       PIDinput = qtra.readLine(sensorValues);
     }
-    */
   }
   
   // check for sharp left
   if (sensorValues[7] > 700 && sensorValues[6] > 700) {
-    /*
-    Serial.println("sharp turn noticed, keep going until all white");
-    // ? push ahead until all sensors white THEN rotate ?
-    // rotate left until PIDinput is 3000 then resume PID
-    while (sensorValues[0] > 700 | sensorValues[1] > 700 | sensorValues[2] > 700 | sensorValues[3] > 700 | sensorValues[4] > 700 | sensorValues[5] > 700 | sensorValues[6] > 700 | sensorValues[7] > 700){
-      Serial.println("Going until all white");
-      speedMotorA = 120;
-      // ??? .93 here ???
-      speedMotorB = 120;
-      leftMotor.move(forward, speedMotorA);
-      rightMotor.move(forward, speedMotorB);
-      PIDinput = qtra.readLine(sensorValues);
-    }
-    */
-    /* This chunk not needed since we're populating PIDinput in previous block. All white check will handle this corrective turn.
-    while ( PIDinput > 3500 ) {
-      Serial.println(" ");
-      Serial.println("Rotating Left");
-      speedMotorA = 120;
-      speedMotorB = 120;
-      leftMotor.move(backward, speedMotorA);
-      rightMotor.move(forward, speedMotorB);
-      PIDinput = qtra.readLine(sensorValues);
-    }
-    */
-    Serial.println("sharp turn noticed, punch through a little");
+
+    Serial.println("sharp turn noticed, until all white, then punch through just a little more");
     var=0;
-    while(var < 30){ // punch through of 20 too low if battery is low and bot is really slow.
+    //while(var < 500){ // punch through of 20 too low if battery is low and bot is really slow.   Why not punch through until all white? because the go until white hurts intersection performance
+    // ...unless we could set a max punch of 2 inches, then 213
+    while (sensorValues[0] > 700 | sensorValues[1] > 700 | sensorValues[2] > 700 | sensorValues[3] > 700 | sensorValues[4] > 700 | sensorValues[5] > 700 | sensorValues[6] > 700 | sensorValues[7] > 700){
       Serial.println("punch");
-      speedMotorA = 120;
-      speedMotorB = 120;
+      speedMotorA = 125;
+      speedMotorB = 125;
       speedMotorB = speedMotorB * .93;
       leftMotor.move(forward, speedMotorA);
       rightMotor.move(forward, speedMotorB);
@@ -948,8 +397,28 @@ int navigationLogicF(){
       //                                        switchback corner under right sensors might be the last
       //                                        sensor read causing all white recovery to rotate
       //                                        in the wrong direction.
+      qtra.readLine(sensorValues);  //read sensors here to update array for white checking
       PIDinput = 7000; // seed PIDouput so all white will result in left turn
       var++;
+    }
+    var=0;
+    while(var < 150){
+      Serial.println("punch a little more to fully clear the line before rotating");
+      speedMotorA = 125;
+      speedMotorB = 125;
+      speedMotorB = speedMotorB * .93;
+      leftMotor.move(forward, speedMotorA);
+      rightMotor.move(forward, speedMotorB);
+      var++;
+    }
+    // after punch through, start rotating left
+    while ( PIDinput > 3500 ){
+      speedMotorA = 150; // 120 worked well
+      speedMotorB = 150;
+      speedMotorB = speedMotorB * .93;
+      leftMotor.move(backward, speedMotorA);
+      rightMotor.move(forward, speedMotorB);
+      PIDinput = qtra.readLine(sensorValues);
     }
   }
   
@@ -976,7 +445,6 @@ int navigationLogicF(){
       rightMotor.move(forward, speedMotorB);
       PIDinput = qtra.readLine(sensorValues);
     }
- 
   }
   
   // check for test run length
