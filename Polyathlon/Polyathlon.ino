@@ -52,6 +52,7 @@ const int buttonPin = 2;     // the number of the pushbutton pin
 const int ledPin =  13;      // the number of the LED pin (probably need to change, 13 is popular for other things)
 // variables will change:
 int buttonState = 0;         // variable for reading the pushbutton status
+int var = 0;                 // variable for short loops
 
 ////////////////////////////////////////////////////////////////////////
 // Prepare PID library
@@ -843,46 +844,81 @@ int navigationLogicF(){
     rightMotor.move(forward, speedMotorB);
   }
 
-  /*
-  if (position >= 3500){             // need to vere left, reduce power to MotorB/left.motor
-    Serial.println("    vere Left");
-    speedMotorA = 150 - correctionAmount;
-    speedMotorA = speedMotorA * .93;
-    speedMotorB = 150;
-    leftMotor.move(forward, speedMotorA);
-    rightMotor.move(forward, speedMotorB);
-  }
-
-  if (position < 3500){             // need to vere right, reduce power to MotorA/right.motor
-    Serial.println("    vere Right");
-    speedMotorA = 150;
-    speedMotorA = speedMotorA * .93;
-    speedMotorB = 150 - correctionAmount;
-    leftMotor.move(forward, speedMotorA);
-    rightMotor.move(forward, speedMotorB);
-  } 
-  */
-  
+  // check for all black
   if (sensorValues[0] > 700 && sensorValues[1] > 700 && sensorValues[2] > 700 && sensorValues[3] > 700 && sensorValues[4] > 700 && sensorValues[5] > 700 && sensorValues[6] > 700 && sensorValues[7] > 700)
   {
     Serial.println(" ");
     Serial.println(" Whoa! Everything looks black!");
+    // assume an intersection and proceed for a brief moment. If still all black, stop.
+    var=0;
+    while(var < 50){
+      Serial.println("going forward on black");
+      var++;
+    }
     allStop();
     pause();
   }
-  // if all eight sensors see very high reflectance (white), take some appropriate action for this situation
-  // might need to revisit hardcoding 80. should consider deriving from min/max during calibration sequence
+
+  // check for all white
   if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80)
   {
     Serial.println(" ");
     Serial.println(" Whoa! Everything looks white!");
+    // we've lost the line. rotate towards last known good location
+    if ( PIDinput <= 3500 ) {
+      Serial.println("Lost line off to our right. Rotate right to find");
+      speedMotorA = 120;
+      speedMotorB = 120;
+      leftMotor.move(forward, speedMotorA);
+      rightMotor.move(backward, speedMotorB);
+      PIDinput = qtra.readLine(sensorValues);
+    }
+    if (PIDinput > 3500) {
+      Serial.println("Lost line off to our left. Rotate left to find");
+      speedMotorA = 120;
+      speedMotorB = 120;
+      leftMotor.move(backward, speedMotorA);
+      rightMotor.move(forward, speedMotorB);
+      PIDinput = qtra.readLine(sensorValues);
+    }
+ 
+  }
+  
+  // check for sharp right
+  if (sensorValues[0] > 700)
+  {
+    // rotate right until PIDinput is 3000 then resume PID
+    while ( PIDinput < 3500 ) {
+      Serial.println(" ");
+      Serial.println("Rotating Right");
+      speedMotorA = 120;
+      speedMotorB = 120;
+      leftMotor.move(forward, speedMotorA);
+      rightMotor.move(backward, speedMotorB);
+      PIDinput = qtra.readLine(sensorValues);
+    }
+  }
+  // check for sharp left
+  if (sensorValues[7] > 700)
+  {
+    // rotate left until PIDinput is 3000 then resume PID
+    while ( PIDinput > 3500 ) {
+      Serial.println(" ");
+      Serial.println("Rotating Left");
+      speedMotorA = 120;
+      speedMotorB = 120;
+      leftMotor.move(backward, speedMotorA);
+      rightMotor.move(forward, speedMotorB);
+      PIDinput = qtra.readLine(sensorValues);
+    }
+    
     //allStop();
     //pause();
-    // I've lost the line. Just drop through assuming the last reading will get us back on track.
-  }  
+  }
+  
+
 
   Serial.println(" ");
-  
   TestRuns++;
   if ( TestRuns > 2000 ){
     allStop(); 
