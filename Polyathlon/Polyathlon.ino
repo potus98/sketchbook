@@ -855,8 +855,6 @@ int navigationLogicF(){
       Serial.println("going forward on black");
       var++;
     }
-    allStop();
-    pause();
   }
 
   // check for all white
@@ -864,20 +862,21 @@ int navigationLogicF(){
   {
     Serial.println(" ");
     Serial.println(" Whoa! Everything looks white!");
-    // we've lost the line. rotate towards last known good location
+    // we've lost the line. swing towards last known good location
     if ( PIDinput <= 3500 ) {
-      Serial.println("Lost line off to our right. Rotate right to find");
+      Serial.println("Lost line off to our right. Swing right to find");
+      // maybe add a while loop to swing right until PIDinput >5000 to ensure a long enough swing on switchbacks
       speedMotorA = 120;
-      speedMotorB = 120;
+      speedMotorB = 0;
       leftMotor.move(forward, speedMotorA);
-      rightMotor.move(backward, speedMotorB);
+      rightMotor.move(forward, speedMotorB);
       PIDinput = qtra.readLine(sensorValues);
     }
     if (PIDinput > 3500) {
-      Serial.println("Lost line off to our left. Rotate left to find");
-      speedMotorA = 120;
+      Serial.println("Lost line off to our left. Swing left to find");
+      speedMotorA = 0;
       speedMotorB = 120;
-      leftMotor.move(backward, speedMotorA);
+      leftMotor.move(forward, speedMotorA);
       rightMotor.move(forward, speedMotorB);
       PIDinput = qtra.readLine(sensorValues);
     }
