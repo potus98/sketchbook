@@ -857,34 +857,8 @@ int navigationLogicF(){
     }
   }
 
-  // check for all white
-  if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80)
-  {
-    Serial.println(" ");
-    Serial.println(" Whoa! Everything looks white!");
-    // we've lost the line. swing towards last known good location
-    if ( PIDinput <= 3500 ) {
-      Serial.println("Lost line off to our right. Swing right to find");
-      // maybe add a while loop to swing right until PIDinput >5000 to ensure a long enough swing on switchbacks
-      speedMotorA = 150; // 120 worked well
-      speedMotorB = 150;
-      leftMotor.move(forward, speedMotorA);
-      rightMotor.move(backward, speedMotorB);
-      PIDinput = qtra.readLine(sensorValues);
-    }
-    if (PIDinput > 3500) {
-      Serial.println("Lost line off to our left. Swing left to find");
-      speedMotorA = 150;
-      speedMotorB = 150;
-      leftMotor.move(backward, speedMotorA);
-      rightMotor.move(forward, speedMotorB);
-      PIDinput = qtra.readLine(sensorValues);
-    }
- 
-  }
-  
   // check for sharp right
-  if (sensorValues[0] > 700 && sensorValues[1] > 700 && sensorValues[2] > 700) {
+  if (sensorValues[0] > 700 && sensorValues[1] > 700) {
     /*
     Serial.println("sharp turn noticed, keep going until all white"); // ??? But cross intersections trip this !!!
     // ? push ahead until all sensors white THEN rotate ?
@@ -934,7 +908,7 @@ int navigationLogicF(){
   }
   
   // check for sharp left
-  if (sensorValues[7] > 700 && sensorValues[6] > 700 && sensorValues[5] > 700) {
+  if (sensorValues[7] > 700 && sensorValues[6] > 700) {
     /*
     Serial.println("sharp turn noticed, keep going until all white");
     // ? push ahead until all sensors white THEN rotate ?
@@ -979,9 +953,35 @@ int navigationLogicF(){
     }
   }
   
-  Serial.println(" ");
+  // check for all white
+  if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80)
+  {
+    Serial.println(" ");
+    Serial.println(" Whoa! Everything looks white!");
+    // we've lost the line. swing towards last known good location
+    if ( PIDinput <= 3500 ) {
+      Serial.println("Lost line off to our right. Swing right to find");
+      // maybe add a while loop to swing right until PIDinput >5000 to ensure a long enough swing on switchbacks
+      speedMotorA = 150; // 120 worked well
+      speedMotorB = 150;
+      leftMotor.move(forward, speedMotorA);
+      rightMotor.move(backward, speedMotorB);
+      PIDinput = qtra.readLine(sensorValues);
+    }
+    if (PIDinput > 3500) {
+      Serial.println("Lost line off to our left. Swing left to find");
+      speedMotorA = 150;
+      speedMotorB = 150;
+      leftMotor.move(backward, speedMotorA);
+      rightMotor.move(forward, speedMotorB);
+      PIDinput = qtra.readLine(sensorValues);
+    }
+ 
+  }
+  
+  // check for test run length
   TestRuns++;
-  if ( TestRuns > 2000 ){
+  if ( TestRuns > 8000 ){
     allStop(); 
     Serial.print(TestRuns);
     Serial.println(" TestRuns complete. Pausing for 2 minutes...");
