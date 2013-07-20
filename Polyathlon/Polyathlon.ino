@@ -867,16 +867,16 @@ int navigationLogicF(){
       Serial.println("Lost line off to our right. Swing right to find");
       // maybe add a while loop to swing right until PIDinput >5000 to ensure a long enough swing on switchbacks
       speedMotorA = 120;
-      speedMotorB = 0;
+      speedMotorB = 120;
       leftMotor.move(forward, speedMotorA);
-      rightMotor.move(forward, speedMotorB);
+      rightMotor.move(backward, speedMotorB);
       PIDinput = qtra.readLine(sensorValues);
     }
     if (PIDinput > 3500) {
       Serial.println("Lost line off to our left. Swing left to find");
-      speedMotorA = 0;
+      speedMotorA = 120;
       speedMotorB = 120;
-      leftMotor.move(forward, speedMotorA);
+      leftMotor.move(backward, speedMotorA);
       rightMotor.move(forward, speedMotorB);
       PIDinput = qtra.readLine(sensorValues);
     }
@@ -884,9 +884,42 @@ int navigationLogicF(){
   }
   
   // check for sharp right
-  if (sensorValues[0] > 700)
-  {
+  if (sensorValues[0] > 700 && sensorValues[1] > 700 && sensorValues[2] > 700) {
+    /*
+    Serial.println("sharp turn noticed, keep going until all white"); // ??? But cross intersections trip this !!!
+    // ? push ahead until all sensors white THEN rotate ?
     // rotate right until PIDinput is 3000 then resume PID
+    while (sensorValues[0] > 700 | sensorValues[1] > 700 | sensorValues[2] > 700 | sensorValues[3] > 700 | sensorValues[4] > 700 | sensorValues[5] > 700 | sensorValues[6] > 700 | sensorValues[7] > 700){
+      Serial.println("Going until all white");
+      speedMotorA = 120;
+      // ??? .93 here ???
+      speedMotorB = 120;
+      leftMotor.move(forward, speedMotorA);
+      rightMotor.move(forward, speedMotorB);
+      PIDinput = qtra.readLine(sensorValues);
+    }
+    */
+    // if this is an intersection, we'll end up on the other side and resume PID
+    // if this is a hard right or switchback, the all white turn right pivot should get us back on track
+    Serial.println("sharp turn noticed, punch through a little");
+    var=0;
+    while(var < 20){  // punch through of 20 too low if battery is low and bot is really slow.
+      Serial.println("punch");
+      speedMotorA = 120;
+      speedMotorB = 120;
+      speedMotorB = speedMotorB * .93;
+      leftMotor.move(forward, speedMotorA);
+      rightMotor.move(forward, speedMotorB);
+      //PIDinput = qtra.readLine(sensorValues); Since this punch was tripped by 3 right sensors, 
+      //                                        don't want to continue updating PIDinput or a
+      //                                        switchback corner under left sensors might be the last
+      //                                        sensor read causing all white recovery to rotate
+      //                                        in the wrong direction.
+      var++;
+    }
+    
+    
+    /* This chunk not needed since we're populating PIDinput in previous block. All white check will handle this corrective turn.
     while ( PIDinput < 3500 ) {
       Serial.println(" ");
       Serial.println("Rotating Right");
@@ -896,11 +929,26 @@ int navigationLogicF(){
       rightMotor.move(backward, speedMotorB);
       PIDinput = qtra.readLine(sensorValues);
     }
+    */
   }
+  
   // check for sharp left
-  if (sensorValues[7] > 700)
-  {
+  if (sensorValues[7] > 700 && sensorValues[6] > 700 && sensorValues[5] > 700) {
+    /*
+    Serial.println("sharp turn noticed, keep going until all white");
+    // ? push ahead until all sensors white THEN rotate ?
     // rotate left until PIDinput is 3000 then resume PID
+    while (sensorValues[0] > 700 | sensorValues[1] > 700 | sensorValues[2] > 700 | sensorValues[3] > 700 | sensorValues[4] > 700 | sensorValues[5] > 700 | sensorValues[6] > 700 | sensorValues[7] > 700){
+      Serial.println("Going until all white");
+      speedMotorA = 120;
+      // ??? .93 here ???
+      speedMotorB = 120;
+      leftMotor.move(forward, speedMotorA);
+      rightMotor.move(forward, speedMotorB);
+      PIDinput = qtra.readLine(sensorValues);
+    }
+    */
+    /* This chunk not needed since we're populating PIDinput in previous block. All white check will handle this corrective turn.
     while ( PIDinput > 3500 ) {
       Serial.println(" ");
       Serial.println("Rotating Left");
@@ -910,13 +958,25 @@ int navigationLogicF(){
       rightMotor.move(forward, speedMotorB);
       PIDinput = qtra.readLine(sensorValues);
     }
-    
-    //allStop();
-    //pause();
+    */
+    Serial.println("sharp turn noticed, punch through a little");
+    var=0;
+    while(var < 20){ // punch through of 20 too low if battery is low and bot is really slow.
+      Serial.println("punch");
+      speedMotorA = 120;
+      speedMotorB = 120;
+      speedMotorB = speedMotorB * .93;
+      leftMotor.move(forward, speedMotorA);
+      rightMotor.move(forward, speedMotorB);
+      //PIDinput = qtra.readLine(sensorValues); Since this punch was tripped by 3 left sensors,
+      //                                        don't want to continue updating PIDinput or a
+      //                                        switchback corner under right sensors might be the last
+      //                                        sensor read causing all white recovery to rotate
+      //                                        in the wrong direction.
+      var++;
+    }
   }
   
-
-
   Serial.println(" ");
   TestRuns++;
   if ( TestRuns > 2000 ){
