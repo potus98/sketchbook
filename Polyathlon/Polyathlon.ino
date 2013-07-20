@@ -780,7 +780,7 @@ int navigationLogicF(){
   PIDinput = qtra.readLine(sensorValues);
   myPID.Compute();
   //PIDoutputMapped = map(PIDoutput, 0, 255, 0, 255);
-  delay(25); // Provide time for screen scrolling
+  //delay(25); // Provide time for screen scrolling
   Serial.print(PIDsetpoint);
   Serial.print(",");
   Serial.print(PIDinput);
@@ -821,9 +821,9 @@ int navigationLogicF(){
   
   if ( PIDoutput < 0 ){
     PIDoutputABS=abs(PIDoutput); // convert to absolute value
-    speedMotorB = 160;
+    speedMotorB = 200;
     //speedMotorA? = speedMotorA * .93; // compensate for tested out of of tolerance
-    speedMotorA = map(PIDoutputABS, 255, 0, 50, 160);
+    speedMotorA = map(PIDoutputABS, 255, 0, 50, 200); // 50,160 worked well
     Serial.print(speedMotorA);
     Serial.print(",");
     Serial.print(speedMotorB);
@@ -833,8 +833,8 @@ int navigationLogicF(){
   }
   
     if ( PIDoutput > 0 ){
-    speedMotorA = 160;
-    speedMotorB = map(PIDoutput, 255, 0, 50, 160);
+    speedMotorA = 200;
+    speedMotorB = map(PIDoutput, 255, 0, 50, 200);
     //speedMotorA? = speedMotorA * .93; // compensate for tested out of of tolerance
     Serial.print(speedMotorA);
     Serial.print(",");
@@ -866,16 +866,16 @@ int navigationLogicF(){
     if ( PIDinput <= 3500 ) {
       Serial.println("Lost line off to our right. Swing right to find");
       // maybe add a while loop to swing right until PIDinput >5000 to ensure a long enough swing on switchbacks
-      speedMotorA = 120;
-      speedMotorB = 120;
+      speedMotorA = 150; // 120 worked well
+      speedMotorB = 150;
       leftMotor.move(forward, speedMotorA);
       rightMotor.move(backward, speedMotorB);
       PIDinput = qtra.readLine(sensorValues);
     }
     if (PIDinput > 3500) {
       Serial.println("Lost line off to our left. Swing left to find");
-      speedMotorA = 120;
-      speedMotorB = 120;
+      speedMotorA = 150;
+      speedMotorB = 150;
       leftMotor.move(backward, speedMotorA);
       rightMotor.move(forward, speedMotorB);
       PIDinput = qtra.readLine(sensorValues);
@@ -903,7 +903,7 @@ int navigationLogicF(){
     // if this is a hard right or switchback, the all white turn right pivot should get us back on track
     Serial.println("sharp turn noticed, punch through a little");
     var=0;
-    while(var < 20){  // punch through of 20 too low if battery is low and bot is really slow.
+    while(var < 30){  // punch through of 20 too low if battery is low and bot is really slow.
       Serial.println("punch");
       speedMotorA = 120;
       speedMotorB = 120;
@@ -915,6 +915,7 @@ int navigationLogicF(){
       //                                        switchback corner under left sensors might be the last
       //                                        sensor read causing all white recovery to rotate
       //                                        in the wrong direction.
+      PIDinput = 0; // seed PIDouput so all white will result in right turn      
       var++;
     }
     
@@ -961,7 +962,7 @@ int navigationLogicF(){
     */
     Serial.println("sharp turn noticed, punch through a little");
     var=0;
-    while(var < 20){ // punch through of 20 too low if battery is low and bot is really slow.
+    while(var < 30){ // punch through of 20 too low if battery is low and bot is really slow.
       Serial.println("punch");
       speedMotorA = 120;
       speedMotorB = 120;
@@ -973,6 +974,7 @@ int navigationLogicF(){
       //                                        switchback corner under right sensors might be the last
       //                                        sensor read causing all white recovery to rotate
       //                                        in the wrong direction.
+      PIDinput = 7000; // seed PIDouput so all white will result in left turn
       var++;
     }
   }
