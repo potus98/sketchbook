@@ -61,6 +61,10 @@ const int ledPinFR = 47;     // LED pin for Front Right status LED
 const int ledPinRL = 49;     // LED pin for Rear Left status LED
 const int ledPinRR = 51;     // LED pin for Rear Right status LED
 
+const int pingPinA = 32;         // defines signal pin used by Front Left ping sensor
+const int pingPinB = 34;         // defines signal pin used by Front Left ping sensor
+const int pingPinC = 36;         // defines signal pin used by Front Left ping sensor
+
 // variables will change:
 int buttonState = 0;         // variable for reading the pushbutton status
 int buttonStateB = 0;        // variable for reading the second pushbutton status
@@ -93,6 +97,8 @@ int speedMotorA = 0;
 int speedMotorB = 0;
   
 // wheelie popping might be complicating? it's tiny, but it does happen occassionally
+
+int pingArray[] = {0, 0, 0};
 
 ////////////////////////////////////////////////////////////////////////
 // Prepare 
@@ -199,8 +205,9 @@ void loop()
   // C) Beacon Killer
   // D) Beacon Killer with obstacles
   // E) Navigation by dead reckoning
-  deadReckoning();
+  //deadReckoning();
   // F) Bulldozer
+  bulldozer();
   
   // Diagnostic Functions
   //navigationSensorTest(); // display reflectance sensor array reading
@@ -630,22 +637,137 @@ int navigationLogicF(){
 int deadReckoning(){
   Serial.println("Entering deadReckoning function");
   pause();
-  //360 degrees of wheel resolution should be approximately 7.75” of travel distance
-  //4' = 48”
-  //48” / 7.75” = 6.193548387
-  //6.193548387 * 360 = 2229.677419355
-  //2229.677419355 / 4 = 557.419354839 (break the leg into 4 smaller segments)
+  // Goal: Drive clockwise around an equalateral triangle with 4' sides. Return to same starting point.
+  // 360 degrees of wheel resolution should be approximately 7.75” of travel distance
+  // 4' = 48”
+  // 48” / 7.75” = 6.193548387
+  // 6.193548387 * 360 = 2229.677419355
+  // 2229.677419355 / 4 = 557.419354839 (break the leg into 4 smaller segments)
+  
+  // Leg 1
   var=0;
   while(var<1){
     speedMotorA = 150;
     speedMotorB = 150;
-    speedMotorB = speedMotorB * .93;
-    leftMotor.move(forward, speedMotorA, 2230, brake);
-    rightMotor.move(forward, speedMotorB, 2230, brake);
-    delay(4000);
+    speedMotorB = speedMotorB * .97; // .97 at 150 with new battery worked well
+    leftMotor.move(forward, speedMotorA, 2220, brake);
+    rightMotor.move(forward, speedMotorB, 2220, brake);
+    delay(10000);
     var++;
   }
   Serial.println("pausing...");
+  //pause();
+  
+  // Rotate right 120 degrees
+  leftMotor.move(forward, speedMotorA, 230, brake);
+  rightMotor.move(backward, speedMotorB, 230, brake);
+  delay(3000);
+  //pause();
+  
+  // Leg 2
+  var=0;
+  while(var<1){
+    speedMotorA = 150;
+    speedMotorB = 150;
+    speedMotorB = speedMotorB * .97; // .97 at 150 with new battery worked well
+    leftMotor.move(forward, speedMotorA, 2220, brake);
+    rightMotor.move(forward, speedMotorB, 2220, brake);
+    delay(10000);
+    var++;
+  }  
   pause();
+  // Rotate right 120 degrees
+  leftMotor.move(forward, speedMotorA, 230, brake);
+  rightMotor.move(backward, speedMotorB, 230, brake);
+  delay(3000);
+  //pause();
+  
+  // Leg 3
+  var=0;
+  while(var<1){
+    speedMotorA = 150;
+    speedMotorB = 150;
+    speedMotorB = speedMotorB * .97; // .97 at 150 with new battery worked well
+    leftMotor.move(forward, speedMotorA, 2220, brake);
+    rightMotor.move(forward, speedMotorB, 2220, brake);
+    delay(10000);
+    var++;
+  }
+  
+  // Rotate right 120 degrees
+  leftMotor.move(forward, speedMotorA, 230, brake);
+  rightMotor.move(backward, speedMotorB, 230, brake);
+  delay(3000);
+  //pause();
   
 } // close deadReckoning function
+
+////////////////////////////////////////////////////////////////////////
+int getPingDistances(){
+  long duration, inches, cm;
+
+  pinMode(pingPinA, OUTPUT);
+  digitalWrite(pingPinA, LOW);
+  delayMicroseconds(2);              // original value: 2
+  digitalWrite(pingPinA, HIGH);
+  delayMicroseconds(5);              // original value: 5
+  digitalWrite(pingPinA, LOW);
+  pinMode(pingPinA, INPUT);
+  duration = pulseIn(pingPinA, HIGH);
+  inches = microsecondsToInches(duration);
+  delay(20);                         // Setting too low seemed to introduce issues. Too much ping noise in tube?
+  Serial.print("pingPin[A,B,C] inches: ");
+  Serial.print(inches);
+  
+  pinMode(pingPinB, OUTPUT);
+  digitalWrite(pingPinB, LOW);
+  delayMicroseconds(2);              // original value: 2
+  digitalWrite(pingPinB, HIGH);
+  delayMicroseconds(5);              // original value: 5
+  digitalWrite(pingPinB, LOW);
+  pinMode(pingPinB, INPUT);
+  duration = pulseIn(pingPinB, HIGH);
+  inches = microsecondsToInches(duration);
+  delay(20);                         // Setting too low seemed to introduce issues. Too much ping noise in tube?
+  Serial.print(" ");
+  Serial.print(inches);
+  
+  pinMode(pingPinC, OUTPUT);
+  digitalWrite(pingPinC, LOW);
+  delayMicroseconds(2);              // original value: 2
+  digitalWrite(pingPinC, HIGH);
+  delayMicroseconds(5);              // original value: 5
+  digitalWrite(pingPinC, LOW);
+  pinMode(pingPinC, INPUT);
+  duration = pulseIn(pingPinC, HIGH);
+  inches = microsecondsToInches(duration);
+  delay(20);                         // Setting too low seemed to introduce issues. Too much ping noise in tube?
+  Serial.print(" ");
+  Serial.println(inches);
+
+  return inches;  
+} // close getPingDistances function
+
+////////////////////////////////////////////////////////////////////////
+long microsecondsToInches(long microseconds)
+{
+  // According to Parallax's datasheet for the PING))), there are
+  // 73.746 microseconds per inch (i.e. sound travels at 1130 feet per
+  // second).  This gives the distance travelled by the ping, outbound
+  // and return, so we divide by 2 to get the distance of the obstacle.
+  // See: http://www.parallax.com/dl/docs/prod/acc/28015-PING-v1.3.pdf
+  return microseconds / 74 / 2;
+}
+
+////////////////////////////////////////////////////////////////////////
+long microsecondsToCentimeters(long microseconds)
+{
+  // The speed of sound is 340 m/s or 29 microseconds per centimeter.
+  // The ping travels out and back, so to find the distance of the
+  // object we take half of the distance travelled.
+  return microseconds / 29 / 2;
+}
+
+int bulldozer(){
+    getPingDistances();
+} // close bulldozer function
