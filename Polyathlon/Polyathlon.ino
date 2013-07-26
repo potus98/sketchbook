@@ -48,10 +48,22 @@ unsigned int sensorValues[NUM_SENSORS];
 ////////////////////////////////////////////////////////////////////////
 // Prepare LEDs and pushbuttons
 // constants won't change. They're used here to set pin numbers:
-const int buttonPin = 2;     // the number of the pushbutton pin
 const int ledPin =  13;      // the number of the LED pin (probably need to change, 13 is popular for other things)
+
+const int buttonPin = 33;    // the number of the pushbutton pin
+const int buttonPinB = 35;   // the number of the second pushbutton pin
+const int ledPinBin0 = 37;   // LED pin for binary status array of four LEDs
+const int ledPinBin1 = 39;   // LED pin for binary status array of four LEDs
+const int ledPinBin2 = 41;   // LED pin for binary status array of four LEDs
+const int ledPinBin3 = 43;   // LED pin for binary status array of four LEDs
+const int ledPinFL = 45;     // LED pin for Front Left status LED
+const int ledPinFR = 47;     // LED pin for Front Right status LED
+const int ledPinRL = 49;     // LED pin for Rear Left status LED
+const int ledPinRR = 51;     // LED pin for Rear Right status LED
+
 // variables will change:
 int buttonState = 0;         // variable for reading the pushbutton status
+int buttonStateB = 0;        // variable for reading the second pushbutton status
 int var = 0;                 // variable for short loops
 
 ////////////////////////////////////////////////////////////////////////
@@ -155,21 +167,65 @@ void setup()
 void loop()
 ////////////////////////////////////////////////////////////////////////
 {
-  //Serial.println ("Starting void loop");
-  //navigationSensorTest(); // display reflectance sensor array reading
-  //navigationLogicA();     // has 3 conditions: straight, turn left, turn right
-  //navigationLogicB();     // has 7 states with varying motor responses
-  ////navigationLogicC();       // uses PID library
-  //navigationLogicD();     // lookup tables, basically
-  //navigationLogicE();     // basic PID (non library) implementation
-  navigationLogicF();     // uses PID library, after Balance Beam project
-  //diagnosticDrive(5); 
-  //PIDTestNoMotors();
+  /*
+  /////Serial.println ("Starting void loop");
+  /////navigationSensorTest(); // display reflectance sensor array reading
+  /////navigationLogicA();     // has 3 conditions: straight, turn left, turn right
+  /////navigationLogicB();     // has 7 states with varying motor responses
+  /////navigationLogicC();       // uses PID library
+  /////navigationLogicD();     // lookup tables, basically
+  /////navigationLogicE();     // basic PID (non library) implementation
+  /////diagnosticDrive(5); 
+  /////PIDTestNoMotors();
+  */
+  
+  //navigationLogicF();     // uses PID library, after Balance Beam project
+  DIAGPushButtonsAndLEDs();
 } //end of void loop
 
 ////////////////////////////////////////////////////////////////////////
 /* FUNCTIONS  */
 ////////////////////////////////////////////////////////////////////////
+
+int DIAGPushButtonsAndLEDs(){
+  // flash all LEDs until a button is pushed, then walk left or right depending on button
+  buttonState = digitalRead(buttonPin);
+  buttonStateB = digitalRead(buttonPinB);
+  while (buttonState == HIGH && buttonStateB == HIGH){
+    buttonState = digitalRead(buttonPin);
+    buttonStateB = digitalRead(buttonPinB);
+    digitalWrite(ledPin, HIGH);    // turn on LED (slow blink waiting)
+    delay(150);
+    digitalWrite(ledPinBin0, HIGH);
+    delay(150);
+    digitalWrite(ledPinBin1, HIGH);
+    delay(150);
+    digitalWrite(ledPinBin2, HIGH);
+    delay(150);
+    digitalWrite(ledPinBin3, HIGH);
+    delay(150);
+    digitalWrite(ledPinFL, HIGH);
+    delay(150);
+    digitalWrite(ledPinFR, HIGH);
+    delay(150);
+    digitalWrite(ledPinRL, HIGH);
+    delay(150);
+    digitalWrite(ledPinRR, HIGH);
+    delay(300);
+    digitalWrite(ledPin, LOW);     // turn off LED
+    digitalWrite(ledPinBin0, LOW);
+    digitalWrite(ledPinBin1, LOW);
+    digitalWrite(ledPinBin2, LOW);
+    digitalWrite(ledPinBin3, LOW);
+    digitalWrite(ledPinFL, LOW);
+    digitalWrite(ledPinFR, LOW);
+    digitalWrite(ledPinRL, LOW);
+    digitalWrite(ledPinRR, LOW);
+    delay(300);
+  }
+  delay(5000);   // a button was pressed to leave the blinking loop, so wait 5 seconds and resume
+  
+} // close DIAG-PushButtonsAndLEDs function
 
 int pause(){
   // standby until momentary button is pressed
@@ -358,7 +414,7 @@ int navigationLogicF(){
       var++;
     }
     var=0;
-    while(var < 150){
+    while(var < 25){
       Serial.println("punch a little more to fully clear the line");
       speedMotorA = 125;
       speedMotorB = 125;
@@ -369,9 +425,9 @@ int navigationLogicF(){
     }
 
     // after punch through, start rotating right
-    while ( PIDinput < 3500 ){
-      speedMotorA = 150; // 120 worked well
-      speedMotorB = 150;
+    while ( PIDinput < 2000 ){
+      speedMotorA = 110; // 120 worked well
+      speedMotorB = 110;
       leftMotor.move(forward, speedMotorA);
       rightMotor.move(backward, speedMotorB);
       PIDinput = qtra.readLine(sensorValues);
@@ -402,7 +458,7 @@ int navigationLogicF(){
       var++;
     }
     var=0;
-    while(var < 150){
+    while(var < 25){
       Serial.println("punch a little more to fully clear the line before rotating");
       speedMotorA = 125;
       speedMotorB = 125;
@@ -412,9 +468,9 @@ int navigationLogicF(){
       var++;
     }
     // after punch through, start rotating left
-    while ( PIDinput > 3500 ){
-      speedMotorA = 150; // 120 worked well
-      speedMotorB = 150;
+    while ( PIDinput > 5000 ){
+      speedMotorA = 110; // 120 worked well
+      speedMotorB = 110;
       speedMotorB = speedMotorB * .93;
       leftMotor.move(backward, speedMotorA);
       rightMotor.move(forward, speedMotorB);
