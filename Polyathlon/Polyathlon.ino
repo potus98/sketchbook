@@ -178,7 +178,6 @@ void loop()
 {
   /*
   /////Serial.println ("Starting void loop");
-  /////navigationSensorTest(); // display reflectance sensor array reading
   /////navigationLogicA();     // has 3 conditions: straight, turn left, turn right
   /////navigationLogicB();     // has 7 states with varying motor responses
   /////navigationLogicC();       // uses PID library
@@ -188,8 +187,21 @@ void loop()
   /////PIDTestNoMotors();
   */
   
-  //navigationLogicF();     // uses PID library, after Balance Beam project
-  DIAGPushButtonsAndLEDs();
+  // Polyathlon Events
+  
+  // A) Basic Line Follower
+  // B) Advanced Line Follower
+  navigationLogicF();     // uses PID library, after Balance Beam project
+  
+  // C) Beacon Killer
+  // D) Beacon Killer with obstacles
+  // E) Navigation by dead reckoning
+  // F) Bulldozer
+  
+  // Diagnostic Functions
+  //navigationSensorTest(); // display reflectance sensor array reading
+  //DIAGPushButtonsAndLEDs(); // cycle LEDs and check for button pushes
+  
 } //end of void loop
 
 ////////////////////////////////////////////////////////////////////////
@@ -402,6 +414,28 @@ int navigationLogicF(){
 
   // check for sharp right
   if (sensorValues[0] > 700 && sensorValues[1] > 700) {
+    Serial.println("probably sharp right");
+    PIDinput = 0;
+    // proceed 90 degrees (2")
+    speedMotorA = 150;
+    speedMotorB = 150;
+    speedMotorB = speedMotorB * .93;
+    leftMotor.move(forward, speedMotorA, 90, coast);
+    rightMotor.move(forward, speedMotorB, 90, coast);
+    // if all white, rotate right to 2000
+    if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80){
+      while ( PIDinput < 3000 ){    // no need to rotate all the way back to 3500, just get to 2000 and resume PID. Actually, 3000 might be safer.
+        speedMotorA = 130; // 120 worked well
+        speedMotorB = 130;
+        speedMotorB = speedMotorB * .93;
+        leftMotor.move(forward, speedMotorA);
+        rightMotor.move(backward, speedMotorB);
+        PIDinput = qtra.readLine(sensorValues);
+      }
+    }
+  }
+    
+    /*
     // if this is an intersection, we'll end up on the other side and resume PID
     // if this is a hard right or switchback, the right pivot should get us back on track (or exit quickly if on a good line)
     Serial.println("sharp turn noticed, punch through until white");
@@ -441,12 +475,36 @@ int navigationLogicF(){
       rightMotor.move(backward, speedMotorB);
       PIDinput = qtra.readLine(sensorValues);
     }
-  }
+    */
   
   // check for sharp left
   if (sensorValues[7] > 700 && sensorValues[6] > 700) {
-
-    Serial.println("sharp turn noticed, until all white, then punch through just a little more");
+    Serial.println("probably sharp left");
+    PIDinput = 7000;
+    // proceed 90 degrees (2")
+    speedMotorA = 150;
+    speedMotorB = 150;
+    speedMotorB = speedMotorB * .93;
+    leftMotor.move(forward, speedMotorA, 90, coast);
+    rightMotor.move(forward, speedMotorB, 90, coast);
+    // if all white, rotate left to 5000
+    if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80){
+      while ( PIDinput > 4000 ){    // no need to rotate all the way back to 3500, just get to 5000 and resume PID. Actually, 4000 might be safer.
+        speedMotorA = 130; // 120 worked well
+        speedMotorB = 130;
+        speedMotorB = speedMotorB * .93;
+        leftMotor.move(backward, speedMotorA);
+        rightMotor.move(forward, speedMotorB);
+        PIDinput = qtra.readLine(sensorValues);
+      }
+    }
+  }
+    // resume PID
+    
+    
+    
+    /*
+    Serial.println("sharp left turn noticed, until all white, then punch through just a little more");
     var=0;
     //while(var < 500){ // punch through of 20 too low if battery is low and bot is really slow.   Why not punch through until all white? because the go until white hurts intersection performance
     // ...unless we could set a max punch of 2 inches, then 213
@@ -485,9 +543,9 @@ int navigationLogicF(){
       rightMotor.move(forward, speedMotorB);
       PIDinput = qtra.readLine(sensorValues);
     }
-  }
+    */
   
-  // check for all white
+  // check for all white. If the robot is using this, it's a probably a bad sign
   if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80)
   {
     Serial.println(" ");
