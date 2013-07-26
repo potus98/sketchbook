@@ -137,6 +137,7 @@ void setup()
   myPID.SetMode(AUTOMATIC);               // turn the PID on
 
   ////////////////////////////////////////////////////////////////////////
+  /* moved to calibrateIRarray function
   // calibrate IR array (might move this into a function later)
   delay(500);
   int i;
@@ -170,6 +171,8 @@ void setup()
   ////////////////////////////////////////////////////////////////////////
   // call pause function at end of setup to wait for button push
   pause(); 
+  */ //moved to calibrateIRarray function
+  
 } //end of void setup
 
 ////////////////////////////////////////////////////////////////////////
@@ -191,11 +194,12 @@ void loop()
   
   // A) Basic Line Follower
   // B) Advanced Line Follower
-  navigationLogicF();     // uses PID library, after Balance Beam project
+  //navigationLogicF();     // uses PID library, after Balance Beam project
   
   // C) Beacon Killer
   // D) Beacon Killer with obstacles
   // E) Navigation by dead reckoning
+  deadReckoning();
   // F) Bulldozer
   
   // Diagnostic Functions
@@ -347,11 +351,51 @@ int PIDTestNoMotors(){
   }
 } // close PIDTestNoMotors function
 
+
+////////////////////////////////////////////////////////////////////////
+int calibrateIRarray(){
+    // calibrate IR array (might move this into a function later)
+    delay(500);
+    int i;
+  
+    Serial.println("Running calibration (see the blinky red light)?");
+    for (i = 0; i < 200; i++)      // run calibration for a few seconds
+    {
+      digitalWrite(ledPin, HIGH);  // turn on LED (flicker LED during calibration)
+      delay(20);
+      qtra.calibrate();            // reads all sensors 10 times at 2.5 ms per six sensors (i.e. ~25 ms per call)
+      digitalWrite(ledPin, LOW);   // turn off LED
+      delay(20);
+    }
+    digitalWrite(ledPin, LOW);     // turn off LED to indicate we are through with calibration
+    // print the calibration MINimum values measured when emitters were on
+    for (i = 0; i < NUM_SENSORS; i++)
+    {
+      Serial.print(qtra.calibratedMinimumOn[i]);
+      Serial.print(' ');
+    }
+    Serial.println();
+    // print the calibration MAXimum values measured when emitters were on
+    for (i = 0; i < NUM_SENSORS; i++)
+    {
+      Serial.print(qtra.calibratedMaximumOn[i]);
+      Serial.print(' ');
+    }
+    Serial.println();
+    Serial.println();
+    delay(1000);
+    ////////////////////////////////////////////////////////////////////////
+    // call pause function at end of setup to wait for button push
+    pause(); 
+} // close calibrateIRarray function
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 int navigationLogicF(){
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   
   if (TestRuns == 0){
+    calibrateIRarray();
     Serial.println("PID tunings: .2-0-.05");                                         //   <<< Change PID here 2/2 <<<<
     Serial.println("PIDsetpoint LinePosition PIDoutput speedMotorA speedMotorB");
   }  
@@ -581,3 +625,27 @@ int navigationLogicF(){
     TestRuns = 0;
   }
 } // close PIDTestNoMotors function
+
+////////////////////////////////////////////////////////////////////////
+int deadReckoning(){
+  Serial.println("Entering deadReckoning function");
+  pause();
+  //360 degrees of wheel resolution should be approximately 7.75” of travel distance
+  //4' = 48”
+  //48” / 7.75” = 6.193548387
+  //6.193548387 * 360 = 2229.677419355
+  //2229.677419355 / 4 = 557.419354839 (break the leg into 4 smaller segments)
+  var=0;
+  while(var<1){
+    speedMotorA = 150;
+    speedMotorB = 150;
+    speedMotorB = speedMotorB * .93;
+    leftMotor.move(forward, speedMotorA, 2230, brake);
+    rightMotor.move(forward, speedMotorB, 2230, brake);
+    delay(4000);
+    var++;
+  }
+  Serial.println("pausing...");
+  pause();
+  
+} // close deadReckoning function
