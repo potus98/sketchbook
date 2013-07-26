@@ -106,10 +106,19 @@ void setup()
   ////////////////////////////////////////////////////////////////////////
   // initialize LED pin as an output
   pinMode(ledPin, OUTPUT);
+  pinMode(ledPinBin0, OUTPUT);
+  pinMode(ledPinBin1, OUTPUT);
+  pinMode(ledPinBin2, OUTPUT);
+  pinMode(ledPinBin3, OUTPUT);
+  pinMode(ledPinFL, OUTPUT);
+  pinMode(ledPinFR, OUTPUT);
+  pinMode(ledPinRL, OUTPUT);
+  pinMode(ledPinRR, OUTPUT);
 
   ////////////////////////////////////////////////////////////////////////
   // initialize pushbutton pin as an input:
   pinMode(buttonPin, INPUT);
+  pinMode(buttonPinB, INPUT);
   
   ////////////////////////////////////////////////////////////////////////
   // initialize maximum speed
