@@ -67,6 +67,13 @@ unsigned int sensorValues[NUM_SENSORS];
 int lastError = 0;
 
 ////////////////////////////////////////////////////////////////////////
+//Prepare Parralax BlueTooth Module RN-42
+#include <SoftwareSerial.h>
+//SoftwareSerial bluetooth(bluetoothTx, bluetoothRx); // uncomment this line for use with Arduino UNO, comment out for Mega 2560
+int bluetoothTx = 14;           // TX-O pin of bluetooth (Mega 2560 pin 14)
+int bluetoothRx = 15;           // RX-I pin of bluetooth (Mega 2560 pin 15)
+
+////////////////////////////////////////////////////////////////////////
 // Prepare misc variables
 int TestRuns = 0;              // counter used to limit total number of cycles to make data collection easier                               
 int speedMotorA = 0;
@@ -79,8 +86,9 @@ int IRblack = 600; // any IR value larger than this is treated as black
 // Setup
 void setup()
 {
-  Serial.begin(115200);            // initialize serial communication
-  pinMode(ledPin, OUTPUT);         // initialize the digital pin as an output
+  Serial.begin(115200);          // initialize serial communication over USB
+  Serial3.begin(9600);         // Begin the serial monitor over BlueTooth. Use with Arduino Mega 2560 w/ pins 14,15
+  pinMode(ledPin, OUTPUT);       // initialize the digital pin as an output
 
 } // close void setup()
 
@@ -96,8 +104,9 @@ void loop()
   }  
 
   //testNXTShield();          // basic test/demo of NXTShield driving two NXT servos
+  testBlueToothSerial();       // basic test/demo of Parallax BlueTooth Module RN-42
   //calibrateIRarray();
-  lineFollowerMode();  
+  //lineFollowerMode();
 
   // check for test run length
   TestRuns++;
@@ -114,6 +123,7 @@ void loop()
 ////////////////////////////////////////////////////////////////////////
 /* FUNCTIONS  */
 ////////////////////////////////////////////////////////////////////////
+
 
 int testNXTShield(){
 
@@ -164,6 +174,14 @@ int testIRarray(){
   }
   Serial.println(' ');
 }  // close testIRarray
+
+
+////////////////////////////////////////////////////////////////////////
+int testBlueToothSerial(){
+  Serial.println("Entering testBlueToothSerial function");
+  Serial3.println("TX test: 0123456789");
+  delay(2000);
+}  // close testBlueToothSerial
 
 
 ////////////////////////////////////////////////////////////////////////
