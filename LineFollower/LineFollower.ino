@@ -101,7 +101,7 @@ void loop()
 
   // check for test run length
   TestRuns++;
-  if ( TestRuns > 4000 ){                                              // Change to 200000 before competition !!!
+  if ( TestRuns > 4000 ){            // Change to 200000 (or remove TestRun checking) before competition !!!
     allStop(); 
     delay(5000);
     TestRuns = 0;
