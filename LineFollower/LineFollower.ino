@@ -44,7 +44,13 @@
 ////////////////////////////////////////////////////////////////////////
 // Prepare LEDs and pushbuttons
 // constants won't change. They're used here to set pin numbers:
-const int ledPin =  13;     // NXT shield already has an LED on pin 13, let's use it
+const int ledPin =  13;        // NXT shield already has an LED on pin 13, let's use it
+const int buttonPinA = 33;     // outer pushbutton pin (pause/play)
+const int buttonPinB = 35;     // inner pushbutton pin (mode changer)
+// variables will change:
+int buttonStateA = 0;          // variable for reading the pushbutton status
+int buttonStateB = 0;          // variable for reading the second pushbutton status
+//int var = 0;                 // variable for short loops TODO clean-up locally defined vars and uncomment this
 
 ////////////////////////////////////////////////////////////////////////
 // Prepare Pololu QTR-8A IR Reflectance Array
@@ -87,7 +93,8 @@ int IRblack = 600; // any IR value larger than this is treated as black
 void setup()
 {
   Serial.begin(115200);          // initialize serial communication over USB
-  Serial3.begin(9600);         // Begin the serial monitor over BlueTooth. Use with Arduino Mega 2560 w/ pins 14,15
+  Serial3.begin(9600);           // Begin the serial monitor over BlueTooth. Use with Arduino Mega 2560 w/ pins 14,15
+                                 // seems to only support 9600 baud rate (??), 19200 is garbled, 115200 is nothing
   pinMode(ledPin, OUTPUT);       // initialize the digital pin as an output
 
 } // close void setup()
@@ -101,6 +108,7 @@ void loop()
   if (TestRuns == 0){
     delay(3000);
     calibrateIRarray();  // TODO do I need to calibrate array every time?
+    pause();
   }  
 
   //testNXTShield();          // basic test/demo of NXTShield driving two NXT servos
@@ -219,6 +227,30 @@ int calibrateIRarray(){
     //pause();
     Serial.println("Leaving calibrateIRarray function");
 } // close calibrateIRarray function
+
+
+////////////////////////////////////////////////////////////////////////
+int pause(){
+  Serial.println("entering pause function");
+  Serial3.println("entering pause function");
+  // standby until momentary button is pressed
+  // useful after calibration is complete, but before the event starts
+  allStop();
+  buttonStateA = digitalRead(buttonPinA);
+  // buttsonState is HIGH while untouched, pressed button causes LOW
+  while(buttonStateA == HIGH){
+    buttonStateA = digitalRead(buttonPinA);
+    digitalWrite(ledPin, HIGH);    // turn on LED (slow blink waiting)
+    delay(250);
+    digitalWrite(ledPin, LOW);     // turn off LED
+    delay(250); 
+  }
+  Serial.println("Button A pressed! Start 5 second delay...");
+  Serial3.println("Button A pressed! Start 5 second delay...");
+  delay(5000);
+  Serial.println("Time's up! Leaving pause loop.");
+  Serial3.println("Time's up! Leaving pause loop.");
+}
 
 
 ////////////////////////////////////////////////////////////////////////
