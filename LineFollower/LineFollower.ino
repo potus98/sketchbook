@@ -68,8 +68,8 @@ unsigned int sensorValues[NUM_SENSORS];
 #define Kd .8 // experiment to determine this, slowly increase the speeds and adjust this value. ( Note: Kp < Kd) 
 #define rightMaxSpeed 200 // max speed of the robot
 #define leftMaxSpeed 200 // max speed of the robot
-#define rightBaseSpeed 150 // this is the speed at which the motors should spin when the robot is perfectly on the line
-#define leftBaseSpeed 150  // this is the speed at which the motors should spin when the robot is perfectly on the line
+#define rightBaseSpeed 170 // this is the speed at which the motors should spin when the robot is perfectly on the line
+#define leftBaseSpeed 170  // this is the speed at which the motors should spin when the robot is perfectly on the line
 int lastError = 0;
 
 ////////////////////////////////////////////////////////////////////////
@@ -85,8 +85,8 @@ int TestRuns = 0;              // counter used to limit total number of cycles t
 int speedMotorA = 0;
 int speedMotorB = 0;
 int nodeType = 0;
-int IRwhite = 200; // any IR value smaller than this is treated as white
-int IRblack = 600; // any IR value larger than this is treated as black
+int IRwhite = 300; // any IR value smaller than this is treated as white
+int IRblack = 500; // any IR value larger than this is treated as black
 
 ////////////////////////////////////////////////////////////////////////
 // Setup
@@ -194,11 +194,11 @@ int testBlueToothSerial(){
 
 ////////////////////////////////////////////////////////////////////////
 int calibrateIRarray(){
-    delay(500);
     int i;
   
     Serial.println("Running calibration (see the blinky red light)?");
-    for (i = 0; i < 200; i++)      // run calibration for a few seconds
+    Serial3.println("Running calibration (see the blinky red light)?");
+    for (i = 0; i < 100; i++)      // run calibration for a few seconds (reduced from 200 to 100)
     {
       digitalWrite(ledPin, HIGH);  // turn on LED (flicker LED during calibration)
       delay(20);
@@ -211,21 +211,22 @@ int calibrateIRarray(){
     for (i = 0; i < NUM_SENSORS; i++)
     {
       Serial.print(qtra.calibratedMinimumOn[i]);
+      Serial3.print(qtra.calibratedMinimumOn[i]);
       Serial.print(' ');
+      Serial3.print(' ');
     }
     Serial.println();
+    Serial3.println();
     // print the calibration MAXimum values measured when emitters were on
     for (i = 0; i < NUM_SENSORS; i++)
     {
       Serial.print(qtra.calibratedMaximumOn[i]);
+      Serial3.print(qtra.calibratedMaximumOn[i]);
       Serial.print(' ');
+      Serial3.print(' ');
     }
-    Serial.println();
-    Serial.println();
-    delay(1000);
-    // call pause function at end of calibration to wait for button push
-    //pause();
     Serial.println("Leaving calibrateIRarray function");
+    Serial3.println("Leaving calibrateIRarray function");
 } // close calibrateIRarray function
 
 
@@ -267,12 +268,16 @@ int lineFollowerMode(){                  // bot acts like a line follower
   
   switch (nodeType) {
     case 3:
+      // Although nice to know we passed a 4-way intersection, we've already
+      // passed it by this point due to evaluating the intersection.
+      // So, just continue following the line
+      followLine();
       // TODO move following to separate function
       // proceed 1" (8" wheel circumference = 45 degrees per inch)
       //Motor1.move(BACKWARD, 100, 45, COAST);
       //Motor2.move(BACKWARD, 100, 45, COAST);
-      Motor1.move(BACKWARD, 100, 45, BRAKE);
-      Motor2.move(BACKWARD, 100, 45, BRAKE);
+      //Motor1.move(BACKWARD, 100, 45, BRAKE);
+      //Motor2.move(BACKWARD, 100, 45, BRAKE);
       //while (Motor1.isTurning() || Motor2.isTurning()); // Wait until it has reached the position
       //delay(3000); // this delay for testing purposes. TODO remove it later
       break;
@@ -379,12 +384,12 @@ int checkForNode(){
     Serial.println("Intersection?");
     Serial3.println("Intersection?");
     allStop();
-    delay(500);
+    //delay(500);
     // proceed 1" (8" wheel circumference = 45 degrees per inch)
     Motor1.move(BACKWARD, 100, 45, BRAKE);
     Motor2.move(BACKWARD, 100, 45, BRAKE);
     //while (Motor1.isTurning() || Motor2.isTurning()); // Wait until it has reached the position
-    //delay(2000);
+    delay(250);
     Serial.println(" - check for 4-way intersection");
     Serial3.println(" - check for 4-way intersection");
     qtra.readLine(sensorValues);
@@ -404,7 +409,7 @@ int checkForNode(){
       Motor1.move(BACKWARD, 100, 45, BRAKE);
       Motor2.move(BACKWARD, 100, 45, BRAKE);
       //while (Motor1.isTurning() || Motor2.isTurning()); // Wait until it has reached the position
-      delay(1000);
+      delay(250);        // debugging, remove later? (might need to give previous movement a chance to finish?)
       Serial.println(" - check for finish square again");
       Serial3.println(" - check for finish square again");
       qtra.readLine(sensorValues);
@@ -440,9 +445,9 @@ int checkForNode(){
     Serial.println("Sharp right?");
     Serial3.println("Sharp right?");
     // proceed 90 degrees (2")
-    Motor1.move(BACKWARD, 150, 90, BRAKE);
-    Motor2.move(BACKWARD, 150, 90, BRAKE);
-    delay(500);  // debugging, remove later
+    Motor1.move(BACKWARD, 150, 45, BRAKE);
+    Motor2.move(BACKWARD, 150, 45, BRAKE);
+    delay(250);  // debugging, remove later (might need to give previous movement a chance to finish?)
     Serial.println(" - check again for sharp right");
     Serial3.println(" - check again for sharp right");
     position = qtra.readLine(sensorValues);
@@ -452,12 +457,12 @@ int checkForNode(){
       Serial.println(" - Yep, it's a sharp right. Rotate right and find line");
       Serial3.println(" - Yep, it's a sharp right. Rotate right and find line");
       while ( position < 1000 ){    // no need to rotate all the way back to 3500, just get to 1000 and resume PD
-        Motor1.move(BACKWARD, 220);
+        Motor1.move(BACKWARD, 170);
         //Motor2.move(FORWARD, 130); // comment out to just pivot, need to coordinate with "proceed 2 inches" distance above
         position = qtra.readLine(sensorValues);
-      }
-      allStop();    // debugging, remove later
-      delay(2000);  // debugging, remove later
+      }      
+      allStop();    // maybe keep allstop to reduce overshoot
+      //delay(2000);  // debugging, remove later
     }
     return 9;
   }
@@ -468,9 +473,9 @@ int checkForNode(){
     Serial.println("Sharp left?");
     Serial3.println("Sharp left?");
     // proceed 90 degrees (2")
-    Motor1.move(BACKWARD, 150, 90, BRAKE);
-    Motor2.move(BACKWARD, 150, 90, BRAKE);
-    delay(500);  // debugging, remove later
+    Motor1.move(BACKWARD, 150, 45, BRAKE);
+    Motor2.move(BACKWARD, 150, 45, BRAKE);
+    delay(250);  // debugging, remove later (might need to give previous movement a chance to finish?)
     Serial.println(" - check again for sharp left");
     Serial3.println(" - check again for sharp left");
     position = qtra.readLine(sensorValues);
@@ -481,11 +486,11 @@ int checkForNode(){
       Serial3.println(" - Yep, it's a sharp left. Rotate left and find line");
       while ( position > 5000 ){    // no need to rotate all the way back to 3500, just get to 5000 and resume PD
         //Motor1.move(FORWARD, 130); // comment out to just pivot, need to coordinate with "proceed 2 inches" distance above
-        Motor2.move(BACKWARD, 220);
+        Motor2.move(BACKWARD, 170);
         position = qtra.readLine(sensorValues);
       }
-      allStop();    // debugging, remove later
-      delay(2000);  // debugging, remove later
+      allStop();    // maybe keep allstop to reduce overshoot
+      //delay(2000);  // debugging, remove later
     }
     return 10;
   }
