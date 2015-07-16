@@ -3,6 +3,7 @@
 //    potus98@yahoo.com
 //    potus98.com
 //    @potus98 on twitter
+//    https://github.com/potus98/sketchbook
 //
 // Code below is not entirely original. It may have snippets or entire
 // sections from other examples or tutorials found online. Thank you
@@ -11,6 +12,11 @@
 //
 // Pololu is awesome. They have great customer service, great prices,
 // and great prodoucts. Not affiliated in any way. Just a satisfied customer.
+//
+// This LineFollower code is finished enough for the stand-alone LineFollower
+// version of code. There's still room for more improvements, but future
+// development will be focused on the Polyathlon version of code:
+// https://github.com/potus98/sketchbook/tree/master/Polyathlon
 //
 ////////////////////////////////////////////////////////////////////////
 //
@@ -64,6 +70,7 @@ unsigned int sensorValues[NUM_SENSORS];
 
 ////////////////////////////////////////////////////////////////////////
 // Prepare PD - alternative to using PID library
+// http://letsmakerobots.com/node/38550
 #define Kp .2 // experiment to determine this, start by something small that just makes your bot follow the line at a slow speed
 #define Kd .8 // experiment to determine this, slowly increase the speeds and adjust this value. ( Note: Kp < Kd) 
 #define rightMaxSpeed 200 // max speed of the robot
