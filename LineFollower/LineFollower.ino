@@ -114,18 +114,18 @@ void loop()
 {
   if (TestRuns == 0){
     delay(3000);
-    calibrateIRarray();  // TODO do I need to calibrate array every time?
+    calibrateIRarray();
     pause();
   }  
 
-  //testNXTShield();          // basic test/demo of NXTShield driving two NXT servos
+  //testNXTShield();             // basic test/demo of NXTShield driving two NXT servos
   //testBlueToothSerial();       // basic test/demo of Parallax BlueTooth Module RN-42
   //calibrateIRarray();
   lineFollowerMode();
 
   // check for test run length
   TestRuns++;
-  if ( TestRuns > 4000 ){            // Change to 200000 (or remove TestRun checking) before competition !!!
+  if ( TestRuns > 80000 ){       // Usually 4000 for testing. Change to big number before competition !!!
     allStop(); 
     delay(5000);
     TestRuns = 0;
