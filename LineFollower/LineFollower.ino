@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////
-// by John Christian
+// by John Christian (-)
 //    potus98@yahoo.com
 //    potus98.com
 //    @potus98 on twitter
