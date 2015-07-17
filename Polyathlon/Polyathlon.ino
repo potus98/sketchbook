@@ -33,6 +33,7 @@
 ////////////////////////////////////////////////////////////////////////
 //
 // TODO
+// variablize turning speed
 // tighten turns when encountering a 90 degree turn (currently swings a little too wide)
 // PD tuning for tighter following on center
 // increase max speeds
@@ -81,19 +82,19 @@ int lastError = 0;
 
 ////////////////////////////////////////////////////////////////////////
 //Prepare Parralax BlueTooth Module RN-42
-#include <SoftwareSerial.h>
+#include <SoftwareSerial.h>     // TODO is this lib even needed with Mega 2560?
 //SoftwareSerial bluetooth(bluetoothTx, bluetoothRx); // uncomment this line for use with Arduino UNO, comment out for Mega 2560
 int bluetoothTx = 14;           // TX-O pin of bluetooth (Mega 2560 pin 14)
 int bluetoothRx = 15;           // RX-I pin of bluetooth (Mega 2560 pin 15)
 
 ////////////////////////////////////////////////////////////////////////
 // Prepare misc variables
-int TestRuns = 0;              // counter used to limit total number of cycles to make data collection easier                               
+int TestRuns = 0;              // counter used to limit total number of cycles to make data collection easier
 int speedMotorA = 0;
 int speedMotorB = 0;
 int nodeType = 0;
-int IRwhite = 300; // any IR value smaller than this is treated as white
-int IRblack = 500; // any IR value larger than this is treated as black
+int IRwhite = 200; // any IR value smaller than this is treated as white
+int IRblack = 600; // any IR value larger than this is treated as black
 
 ////////////////////////////////////////////////////////////////////////
 // Setup
@@ -102,10 +103,10 @@ void setup()
   Serial.begin(115200);          // initialize serial communication over USB
   Serial3.begin(9600);           // Begin the serial monitor over BlueTooth. Use with Arduino Mega 2560 w/ pins 14,15
                                  // seems to only support 9600 baud rate (??), 19200 is garbled, 115200 is nothing
+                                 // TODO baud rates supported by Mega 2560?
   pinMode(ledPin, OUTPUT);       // initialize the digital pin as an output
 
 } // close void setup()
-
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -121,7 +122,8 @@ void loop()
   //testNXTShield();             // basic test/demo of NXTShield driving two NXT servos
   //testBlueToothSerial();       // basic test/demo of Parallax BlueTooth Module RN-42
   //calibrateIRarray();
-  lineFollowerMode();
+  //lineFollowerMode();          // bot acts like a line follower
+  mazeSolverModeRHS();           // bot acts like a maze solver using Right Hand Side algorithm
 
   // check for test run length
   TestRuns++;
@@ -190,6 +192,20 @@ int testIRarray(){
   Serial.println(' ');
 }  // close testIRarray
 
+////////////////////////////////////////////////////////////////////////
+int printIRarray(){
+  // print current IR values on a line
+  int i;
+  for (i = 0; i < NUM_SENSORS; i++)
+  {
+    Serial.print(sensorValues[i]);
+    Serial3.print(sensorValues[i]);
+    Serial.print(' ');
+    Serial3.print(' ');
+  }
+  Serial.println(' ');
+  Serial3.println(' ');
+}  // close testIRarray
 
 ////////////////////////////////////////////////////////////////////////
 int testBlueToothSerial(){
@@ -258,6 +274,8 @@ int pause(){
   delay(5000);
   Serial.println("Time's up! Leaving pause loop.");
   Serial3.println("Time's up! Leaving pause loop.");
+  Serial.println(" ");
+  Serial3.println(" ");
 }
 
 
@@ -275,24 +293,63 @@ int lineFollowerMode(){                  // bot acts like a line follower
   
   switch (nodeType) {
     case 3:
-      // Although nice to know we passed a 4-way intersection, we've already
-      // passed it by this point due to evaluating the intersection.
-      // So, just continue following the line
-      followLine();
-      // TODO move following to separate function
-      // proceed 1" (8" wheel circumference = 45 degrees per inch)
-      //Motor1.move(BACKWARD, 100, 45, COAST);
-      //Motor2.move(BACKWARD, 100, 45, COAST);
-      //Motor1.move(BACKWARD, 100, 45, BRAKE);
-      //Motor2.move(BACKWARD, 100, 45, BRAKE);
-      //while (Motor1.isTurning() || Motor2.isTurning()); // Wait until it has reached the position
-      //delay(3000); // this delay for testing purposes. TODO remove it later
+      followLine();      // already passed 4-way intersection by this point, so keep going
       break;
     default:
       followLine();
-  }
+  } // close switch statement
   
 } // close lineFollowerMode
+
+
+////////////////////////////////////////////////////////////////////////
+int mazeSolverModeRHS(){      // bot acts like a maze solver using Right Hand Side algorithm
+  nodeType = checkForNode();
+
+  switch (nodeType) {
+    case 0:                   // 0  - no node detected
+      followLine();
+      break;
+
+    case 1:                   // 1  - four way intersection (bot can turn left, right, or continue straight)
+      turnRight(130, 220);    //      150 motor speed
+      break;                  //      270 degrees of rotation (6 inches of wheel travel) would be
+                              //      theoretically ideal 90 degree right turn, but reduced to 250 due to extra wheel momentum
+    
+    case 2:                   // 2  - black square (finish box for maze solving)
+      pause();
+      break;
+    
+    case 3:                   // 3  - dead end T intersection (bot can turn left or right)
+      turnRight(130, 220);    //      150 motor speed
+      break;                  //      270 degrees of rotation (6 inches of wheel travel) would be
+                              //      theoretically ideal, but reduced here due to extra wheel momentum
+    
+    case 4:                   // 4  - right hand T intersection (bot can turn right or continue straight)
+      turnRight(130, 220);
+      break;
+    
+    case 5:                   // 5  - left hand T intersection (bot can turn left or continue straight)
+      followLine();
+      break;
+    
+    case 6:                   // 6  - dead end line (bot must stop or complete a U-turn)
+      followLine();           //      bot has already turned by this point
+      break;
+      
+    case 9:                   // 9  - 90 degree right turn (bot can only turn right) need to identify such nodes for building a coordinate grid of a maze
+      followLine();           //      bot has already turned by this point
+      break;
+    
+    case 10:                  // 10 - 90 degree left turn (bot can only turn left) need to identify such nodes for building a coordinate grid of a maze
+      followLine();           //      bot has already turned by this point
+      break;
+    
+    default:
+      followLine();
+    
+  } // close switch statement
+} // close mazeSolverModeRHS
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -324,9 +381,6 @@ int followLine(){                  // Using PD calculations instead of PID libra
 
 ////////////////////////////////////////////////////////////////////////
 int checkForNode(){
-
-  Serial.println("Entering checkForNode function");
-  int position = qtra.readLine(sensorValues); // initalize position in this scope
   
   // Evaluate IR sensor array readings to identify potential nodes or intersections.
   // If sensor readings suggest bot has encountered a node, this function may perform
@@ -349,8 +403,8 @@ int checkForNode(){
   //   6  dead end line (bot must stop or complete a U-turn)
   //
   //      ---- need these for advanced line following ----
-  //   7  right hand switchback
-  //   8  left hand switchback
+  //   7  TODO  right hand switchback
+  //   8  TODO  left hand switchback
   //
   //      ---- need these for more efficient line following (tighter turns),          ----
   //      ---- and more efficient maze solving (tighter turns AND coordinate capture) ----
@@ -364,16 +418,16 @@ int checkForNode(){
   //   only middle four sensors seemed to get tripped by a 90 degree turn when bot was already leaning into the turn
 
   // take an IR reading
-  Serial.println("taking an IR reading");
-  qtra.readLine(sensorValues);
+  //Serial.println("taking an IR reading");
+  //qtra.readLine(sensorValues);
+
+
+  Serial.println("Entering checkForNode function");
+  //Serial3.println("Entering checkForNode function");
+  int position = qtra.readLine(sensorValues); // initalize position in this scope
 
   // print the IR values
-  int i;
-  for (i = 0; i < NUM_SENSORS; i++)
-  {
-    Serial.print(sensorValues[i]);
-    Serial.print(' ');
-  }
+  //printIRarray();
 
   ////////////////////////////////////////////////
   // check for intersections 1, 2, or 3
@@ -393,14 +447,14 @@ int checkForNode(){
     allStop();
     //delay(500);
     // proceed 1" (8" wheel circumference = 45 degrees per inch)
-    Motor1.move(BACKWARD, 100, 45, BRAKE);
-    Motor2.move(BACKWARD, 100, 45, BRAKE);
+    Motor1.move(BACKWARD, 100, 35, BRAKE);
+    Motor2.move(BACKWARD, 100, 35, BRAKE);
     //while (Motor1.isTurning() || Motor2.isTurning()); // Wait until it has reached the position
     delay(250);
+    qtra.readLine(sensorValues);  // obtain reading after just passing over a line
+    
     Serial.println(" - check for 4-way intersection");
     Serial3.println(" - check for 4-way intersection");
-    qtra.readLine(sensorValues);
-
     if ((sensorValues[0] < IRwhite && sensorValues[7] < IRwhite) && (sensorValues[3] > IRblack || sensorValues[4] > IRblack)){
       // outer sensors see white and at least one of the middle sensors sees black
         Serial.println(" - Yep, it's a 4-way intersection");
@@ -409,39 +463,13 @@ int checkForNode(){
     }
     Serial.println(" - Well, it's not a 4-way intersection, check for finish square");
     Serial3.println(" - Well, it's not a 4-way intersection, check for finish square");
-    
-    if (sensorValues[1] > IRblack && sensorValues[2] > IRblack && sensorValues[3] > IRblack && sensorValues[4] > IRblack && sensorValues[5] > IRblack && sensorValues[6] > IRblack)
+    //if (sensorValues[1] > IRblack && sensorValues[2] > IRblack && sensorValues[3] > IRblack && sensorValues[4] > IRblack && sensorValues[5] > IRblack && sensorValues[6] > IRblack)
+    if (sensorValues[2] > IRblack && sensorValues[3] > IRblack && sensorValues[4] > IRblack && sensorValues[5] > IRblack) // reduced to middle four sensors
     {
       Serial.println(" - Yep, it's a finish square");
       Serial3.println(" - Yep, it's a finish square");
-      pause();  // TODO just return 2 and let the maze function do the pause()
+      //pause();  // TODO just return 2 and let the maze function do the pause()
       return 2;
-        
-      /*  Commented out following block because I don't think it's necessary. Bot usually ends up deep enough past
-       *  the cross line that it's well within the black square. A second reading of sensor 1-6 in the black should
-       *  be enough
-      // proceed 1" (8" wheel circumference = 45 degrees per inch)
-      Motor1.move(BACKWARD, 100, 45, BRAKE);
-      Motor2.move(BACKWARD, 100, 45, BRAKE);
-      //while (Motor1.isTurning() || Motor2.isTurning()); // Wait until it has reached the position
-      delay(250);        // debugging, remove later? (might need to give previous movement a chance to finish?)
-      Serial.println(" - check for finish square again");
-      Serial3.println(" - check for finish square again");
-      qtra.readLine(sensorValues);
-      if (sensorValues[1] > IRblack && sensorValues[2] > IRblack && sensorValues[3] > IRblack && sensorValues[4] > IRblack && sensorValues[5] > IRblack && sensorValues[6] > IRblack)
-      {
-        Serial.println(" - Yep, it's a finish square");
-        Serial3.println(" - Yep, it's a finish square");
-        delay(10000); // TODO remove this debugging delay
-        return 2;
-        // TODO I guess bot should check for continuing line (we just crossed a thick cross street?) or all white and recover
-      }
-      Serial.println(" - Wierd, thought I might be in the finish square, but maybe I re-read the cross line too fast?");
-      Serial3.println(" - Wierd, thought I might be in the finish square, but maybe I re-read the cross line too fast?");
-      // Epiphiny, this where I realized I'll either need to stop and take very careful IR readings while advancing specific known distances
-      // OR, remember multiple IR array readings over time (encoder ticks) and compare. AND handle row stretching across time.
-      return 1;
-      */
     }
 
     Serial.println(" - check for dead end T intersection");
@@ -456,45 +484,58 @@ int checkForNode(){
   } //end of check for intersections 1, 2, and 3
 
   ////////////////////////////////////////////////
-  // check for node 9, 90 degree right turn
-  if ((sensorValues[0] > IRblack && sensorValues[1] > IRblack) && (sensorValues[6] < IRwhite && sensorValues[7] < IRwhite)) {
-    Serial.println("Sharp right?");
-    Serial3.println("Sharp right?");
-    // proceed 90 degrees (2")
-    Motor1.move(BACKWARD, 150, 45, BRAKE);
-    Motor2.move(BACKWARD, 150, 45, BRAKE);
-    delay(250);  // debugging, remove later (might need to give previous movement a chance to finish?)
-    Serial.println(" - check again for sharp right");
-    Serial3.println(" - check again for sharp right");
+  // check for node 9 and 4
+  //if ((sensorValues[0] > IRblack && sensorValues[1] > IRblack) && (sensorValues[6] < IRwhite && sensorValues[7] < IRwhite)) {
+  if ((sensorValues[0] > IRblack && sensorValues[1] > IRblack && sensorValues[2] > IRblack) && (sensorValues[6] < IRwhite && sensorValues[7] < IRwhite)) {
+    // sharp right, or 3 way right?
+    Serial.println("Sharp right or 3 way right?");
+    Serial3.println("Sharp right or 3 way right?");
+    // proceed about an inch
+    Motor1.move(BACKWARD, 140, 35, BRAKE);
+    Motor2.move(BACKWARD, 140, 35, BRAKE);
+    delay(350);  // give previous movement a chance to finish
+    Serial.println(" - check again for sharp right or 3 way right");
+    Serial3.println(" - check again for sharp right or 3 way right");
     position = qtra.readLine(sensorValues);
+    
     // check for all white
     if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
       // if all white here, rotate right until seeing line again and return 9
       Serial.println(" - Yep, it's a sharp right. Rotate right and find line");
       Serial3.println(" - Yep, it's a sharp right. Rotate right and find line");
       while ( position < 1000 ){    // no need to rotate all the way back to 3500, just get to 1000 and resume PD
-        Motor1.move(BACKWARD, 170);
+        Motor1.move(BACKWARD, 140);
         //Motor2.move(FORWARD, 130); // comment out to just pivot, need to coordinate with "proceed 2 inches" distance above
         position = qtra.readLine(sensorValues);
       }      
       allStop();    // maybe keep allstop to reduce overshoot
       //delay(2000);  // debugging, remove later
+      return 9;
     }
-    return 9;
-  }
+    
+    // check for 3 way intersection (bot can turn right, or continue straight)
+    if ((sensorValues[0] < IRwhite && sensorValues[7] < IRwhite) && (sensorValues[3] > IRblack || sensorValues[4] > IRblack)){
+      // outer sensors see white and at least one of the middle sensors sees black
+        Serial.println(" - Right-handed 3-way intersection");
+        Serial3.println(" - Right-handed 3-way intersection");
+        return 4;
+    }
+  }  // close check for node 9 and 4
   
   ////////////////////////////////////////////////
-  // check for node 10, 90 degree left turn
-  if ((sensorValues[0] < IRwhite && sensorValues[1] < IRwhite) && (sensorValues[6] > IRblack && sensorValues[7] > IRblack)) {
-    Serial.println("Sharp left?");
-    Serial3.println("Sharp left?");
+  // check for node 10 and 5
+  //if ((sensorValues[0] < IRwhite && sensorValues[1] < IRwhite) && (sensorValues[6] > IRblack && sensorValues[7] > IRblack)) {
+  if ((sensorValues[0] < IRwhite && sensorValues[1] < IRwhite) && (sensorValues[5] > IRblack && sensorValues[6] > IRblack && sensorValues[7] > IRblack)) {
+    Serial.println("Sharp left or 3 way left?");
+    Serial3.println("Sharp left or 3 way left?");
     // proceed 90 degrees (2")
-    Motor1.move(BACKWARD, 150, 45, BRAKE);
-    Motor2.move(BACKWARD, 150, 45, BRAKE);
-    delay(250);  // debugging, remove later (might need to give previous movement a chance to finish?)
-    Serial.println(" - check again for sharp left");
-    Serial3.println(" - check again for sharp left");
+    Motor1.move(BACKWARD, 140, 35, BRAKE);
+    Motor2.move(BACKWARD, 140, 35, BRAKE);
+    delay(350);  // debugging, remove later (might need to give previous movement a chance to finish?)
+    Serial.println(" - check again for sharp left or 3 way left");
+    Serial3.println(" - check again for sharp left or 3 way left");
     position = qtra.readLine(sensorValues);
+    
     // check for all white
     if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
       // if all white here, rotate left until seeing line again and return 10
@@ -502,20 +543,74 @@ int checkForNode(){
       Serial3.println(" - Yep, it's a sharp left. Rotate left and find line");
       while ( position > 5000 ){    // no need to rotate all the way back to 3500, just get to 5000 and resume PD
         //Motor1.move(FORWARD, 130); // comment out to just pivot, need to coordinate with "proceed 2 inches" distance above
-        Motor2.move(BACKWARD, 170);
+        Motor2.move(BACKWARD, 140);
         position = qtra.readLine(sensorValues);
       }
       allStop();    // maybe keep allstop to reduce overshoot
       //delay(2000);  // debugging, remove later
+      return 10;
     }
-    return 10;
+    
+    // check for 3 way intersection (bot can turn left, or continue straight)
+    if ((sensorValues[0] < IRwhite && sensorValues[7] < IRwhite) && (sensorValues[3] > IRblack || sensorValues[4] > IRblack)){
+      // outer sensors see white and at least one of the middle sensors sees black
+        Serial.println(" - Left-handed 3-way intersection");
+        Serial3.println(" - Left-handed 3-way intersection");
+        return 5;
+    }
+  }  // close check for node 10 and 5
+
+  ////////////////////////////////////////////////
+  // check for node 6 (dead end)
+  // I was reading a line and now *BAM* no line whatsoever. Must be a dead end.
+  if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
+    allStop();
+    uTurn(130);  // TODO variablize turn speeds
+    return 6;
   }
 
   // no nodes detected
   Serial.println(" No nodes detected, returning 0 (zero)");
+  Serial3.println(" No nodes detected, returning 0 (zero)");
   return 0;
 } // close checkForNode() function
 
+////////////////////////////////////////////////////////////////////////
+int turnRight(int speed, int degrees){               // robot turns right by pivoting on the right wheel (only running left wheel)
+  Serial.println("Entering turnRight function");
+  Serial3.println("Entering turnRight function");
+  Motor1.move(BACKWARD, speed, degrees, BRAKE);
+  delay(1500);            //      give bot a moment to complete the turn
+  // TODO change this function to accept degrees as intended rotation of bot itself
+  // and calculate the wheel movement necessary to accomplish. ie: "I want my bot
+  // to turn 90 degrees to the right" is more intuitive than "I want my left wheel
+  // to rotate 270-ish degrees to accomplish a right hand turn."
+  //
+  // TODO Better yet, turn right until seeing all white, then start watching for
+  // next line.
+  
+} // close turnRight function
+
+////////////////////////////////////////////////////////////////////////
+int turnLeft(int speed, int degrees){               // robot turns left by pivoting on the left wheel (only running right wheel)
+  Serial.println("Entering turnLeft function");
+  Serial3.println("Entering turnLeft function");
+  Motor2.move(BACKWARD, speed, degrees, BRAKE);
+  delay(1500);            //      give bot a moment to complete the turn
+  // TODO change this function to accept degrees as intended rotation of bot itself
+  // and calculate the wheel movement necessary to accomplish. ie: "I want my bot
+  // to turn 90 degrees to the left" is more intuitive than "I want my right wheel
+  // to rotate 270-ish degrees to accomplish a left hand turn."
+} // close turnLeft function
+
+int uTurn(int speed){                         // robot rotates 180 degrees by pivoting in place (turning wheels in opposite directions)
+  Serial.println("Entering uTurn function");
+  Serial3.println("Entering uTurn function");
+  Motor1.move(BACKWARD, speed, 200, BRAKE);
+  Motor2.move(FORWARD, speed, 200, BRAKE);
+  delay(2000);
+  allStop();
+}
 
 ////////////////////////////////////////////////////////////////////////
 int checkForSwitchback(){
