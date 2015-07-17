@@ -3,6 +3,7 @@
 //    potus98@yahoo.com
 //    potus98.com
 //    @potus98 on twitter
+//    https://github.com/potus98/sketchbook
 //
 // Code below is not entirely original. It may have snippets or entire
 // sections from other examples or tutorials found online. Thank you
@@ -11,362 +12,200 @@
 //
 // Pololu is awesome. They have great customer service, great prices,
 // and great prodoucts. Not affiliated in any way. Just a satisfied customer.
-////////////////////////////////////////////////////////////////////////
-// This example uses
-//  - Arduino Mega 2560
-//  - NXT Motor Shield
-//  - Pololu QTR-8A IR Reflectance Sensor
+//
+// This LineFollower code is finished enough for the stand-alone LineFollower
+// version of code. There's still room for more improvements, but future
+// development will be focused on the Polyathlon version of code:
+// https://github.com/potus98/sketchbook/tree/master/Polyathlon
 //
 ////////////////////////////////////////////////////////////////////////
-// Significant re-write from previous versions
-//  - Removing long comments/explanations
-//  - Leveraging NXTShield libraries
-
-
-// The emitter control pin can optionally be connected to digital pin 2, or you can leave
-// it disconnected and change the EMITTER_PIN #define below from 2 to QTR_NO_EMITTER_PIN.
+//
+// This example uses a Pololu QTR-8A IR Reflectance Sensor and an 
+// Arduino Mega 2560
+//
+// Refatoring and rebuilding this code for new physical bot.
+//
+// Code below is broken up via functions in what might appear to be overly
+// complex for a basic line follower. However, this code is intended to
+// serve as the basis for a polyathlon robot so future flexability is
+// important.
+//
+////////////////////////////////////////////////////////////////////////
+//
+// TODO
+// tighten turns when encountering a 90 degree turn (currently swings a little too wide)
+// PD tuning for tighter following on center
+// increase max speeds
+// remove four way intersection pause
+// add 5 second delay start button
+// implement global #define debugprint Serial.print
 
 ////////////////////////////////////////////////////////////////////////
-// Prepare NXT Motor Shield libraries
+// Prepare NXTShield
 #include <Wire.h>
-#include <NXTShield.h>
-Motor1 leftMotor;
-Motor2 rightMotor;
-  
-////////////////////////////////////////////////////////////////////////
-// Prepare QTR-8A IR Reflectance Array
-#include <QTRSensors.h>
-#define NUM_SENSORS             8  // number of sensors used
-#define NUM_SAMPLES_PER_SENSOR  4  // average 4 analog samples per sensor reading
-#define EMITTER_PIN             27  // emitter is controlled by digital pin 27
-// sensors 0 through 7 are connected to analog inputs 0 through 5, 7, and 8, respectively
-//QTRSensorsAnalog qtra((unsigned char[]) {0, 1, 2, 3, 4, 5, 7, 8}, 
-QTRSensorsAnalog qtra((unsigned char[]) {8, 9, 10, 11, 12, 13, 14, 15}, // new wiring harness
-NUM_SENSORS, NUM_SAMPLES_PER_SENSOR, EMITTER_PIN);
-unsigned int sensorValues[NUM_SENSORS];
+#include <NXTShield.h>     // https://github.com/TKJElectronics/NXTShield
+//Motor1 leftMotor;
+//Motor2 rightMotor;
 
 ////////////////////////////////////////////////////////////////////////
 // Prepare LEDs and pushbuttons
 // constants won't change. They're used here to set pin numbers:
-const int ledPin =  13;      // the number of the LED pin (probably need to change, 13 is popular for other things)
-
-const int buttonPin = 33;    // the number of the pushbutton pin
-const int buttonPinB = 35;   // the number of the second pushbutton pin
-const int ledPinBin0 = 37;   // LED pin for binary status array of four LEDs
-const int ledPinBin1 = 39;   // LED pin for binary status array of four LEDs
-const int ledPinBin2 = 41;   // LED pin for binary status array of four LEDs
-const int ledPinBin3 = 43;   // LED pin for binary status array of four LEDs
-const int ledPinFL = 45;     // LED pin for Front Left status LED
-const int ledPinFR = 47;     // LED pin for Front Right status LED
-const int ledPinRL = 49;     // LED pin for Rear Left status LED
-const int ledPinRR = 51;     // LED pin for Rear Right status LED
-
-const int pingPinA = 32;         // defines signal pin used by Front Left ping sensor
-const int pingPinB = 34;         // defines signal pin used by Front Left ping sensor
-const int pingPinC = 36;         // defines signal pin used by Front Left ping sensor
-
+const int ledPin =  13;        // NXT shield already has an LED on pin 13, let's use it
+const int buttonPinA = 33;     // outer pushbutton pin (pause/play)
+const int buttonPinB = 35;     // inner pushbutton pin (mode changer)
 // variables will change:
-int buttonState = 0;         // variable for reading the pushbutton status
-int buttonStateB = 0;        // variable for reading the second pushbutton status
-int var = 0;                 // variable for short loops
+int buttonStateA = 0;          // variable for reading the pushbutton status
+int buttonStateB = 0;          // variable for reading the second pushbutton status
+//int var = 0;                 // variable for short loops TODO clean-up locally defined vars and uncomment this
 
 ////////////////////////////////////////////////////////////////////////
-// Prepare PID library
-#include <PID_v1.h>   // include the PID library See: http://playground.arduino.cc/Code/PIDLibrary
-// Initialize variables related to PID
-double PIDsetpoint, PIDinput, PIDoutput;
-//resuming project on 7/11/2013 after PID Balance Beam project
-PID myPID(&PIDinput, &PIDoutput, &PIDsetpoint,.2,0,.05, DIRECT);
+// Prepare Pololu QTR-8A IR Reflectance Array
+#include <QTRSensors.h>    // https://github.com/pololu/qtr-sensors-arduino
+#define NUM_SENSORS             8     // number of sensors used
+#define NUM_SAMPLES_PER_SENSOR  4     // average 4 analog samples per sensor reading
+#define EMITTER_PIN             27    // emitter is controlled by digital pin 27
+QTRSensorsAnalog qtra((unsigned char[]) {8, 9, 10, 11, 12, 13, 14, 15},
+NUM_SENSORS, NUM_SAMPLES_PER_SENSOR, EMITTER_PIN);
+unsigned int sensorValues[NUM_SENSORS];
 
-// from br3ttb on arduino forums... Parameters and what they do (sort of)
-// P_Param: the bigger the number the harder the controller pushes.
-// I_Param: the SMALLER the number (except for 0, which turns it off,)  the more quickly the controller reacts to load changes, but the greater the risk of oscillations.
-// D_Param: the bigger the number the more the controller dampens oscillations (to the point where performance can be hindered)
+////////////////////////////////////////////////////////////////////////
+// Prepare PD - alternative to using PID library
+// http://letsmakerobots.com/node/38550
+#define Kp .2 // experiment to determine this, start by something small that just makes your bot follow the line at a slow speed
+#define Kd .8 // experiment to determine this, slowly increase the speeds and adjust this value. ( Note: Kp < Kd) 
+#define rightMaxSpeed 200 // max speed of the robot
+#define leftMaxSpeed 200 // max speed of the robot
+#define rightBaseSpeed 170 // this is the speed at which the motors should spin when the robot is perfectly on the line
+#define leftBaseSpeed 170  // this is the speed at which the motors should spin when the robot is perfectly on the line
+int lastError = 0;
 
-int PIDoutputMapped = 0;       // used when mapping PID output to safe servo range so servo doesn't twist demo rig apart
-int PIDoutputConstrained = 0;  // extra safety against sending servo to positions that might break the demo rig
-//const int pingPin = 7;         // defines signal pin used by ping sensor
-//int timeToPing = 0;            // used during ping sensor operation
-//int BallPosition = 0;          // calculated distance of ball from sensor
-//int setPoint = 30;             // hardcoded target point (to-do: make adjustable via potentiometer)
-//int servoPos = 90;             // servo position
-int TestRuns = 0;              // counter used to limit total number of cycles to make data collection easier
-int PIDoutputABS = 0;          // used when switching negatives to absolute values with abs() function
+////////////////////////////////////////////////////////////////////////
+//Prepare Parralax BlueTooth Module RN-42
+#include <SoftwareSerial.h>
+//SoftwareSerial bluetooth(bluetoothTx, bluetoothRx); // uncomment this line for use with Arduino UNO, comment out for Mega 2560
+int bluetoothTx = 14;           // TX-O pin of bluetooth (Mega 2560 pin 14)
+int bluetoothRx = 15;           // RX-I pin of bluetooth (Mega 2560 pin 15)
 
+////////////////////////////////////////////////////////////////////////
+// Prepare misc variables
+int TestRuns = 0;              // counter used to limit total number of cycles to make data collection easier                               
 int speedMotorA = 0;
 int speedMotorB = 0;
-  
-// wheelie popping might be complicating? it's tiny, but it does happen occassionally
-
-int pingArray[] = {0, 0, 0};
+int nodeType = 0;
+int IRwhite = 300; // any IR value smaller than this is treated as white
+int IRblack = 500; // any IR value larger than this is treated as black
 
 ////////////////////////////////////////////////////////////////////////
-// Prepare 
-////////////////////////////////////////////////////////////////////////
+// Setup
 void setup()
 {
-  ////////////////////////////////////////////////////////////////////////
-  // initialize serial communication
-  Serial.begin(115200);
+  Serial.begin(115200);          // initialize serial communication over USB
+  Serial3.begin(9600);           // Begin the serial monitor over BlueTooth. Use with Arduino Mega 2560 w/ pins 14,15
+                                 // seems to only support 9600 baud rate (??), 19200 is garbled, 115200 is nothing
+  pinMode(ledPin, OUTPUT);       // initialize the digital pin as an output
 
-  ////////////////////////////////////////////////////////////////////////
-  // initialize LED pin as an output
-  pinMode(ledPin, OUTPUT);
-  pinMode(ledPinBin0, OUTPUT);
-  pinMode(ledPinBin1, OUTPUT);
-  pinMode(ledPinBin2, OUTPUT);
-  pinMode(ledPinBin3, OUTPUT);
-  pinMode(ledPinFL, OUTPUT);
-  pinMode(ledPinFR, OUTPUT);
-  pinMode(ledPinRL, OUTPUT);
-  pinMode(ledPinRR, OUTPUT);
+} // close void setup()
 
-  ////////////////////////////////////////////////////////////////////////
-  // initialize pushbutton pin as an input:
-  pinMode(buttonPin, INPUT);
-  pinMode(buttonPinB, INPUT);
-  
-  ////////////////////////////////////////////////////////////////////////
-  // initialize maximum speed
-  // Intent here is to have one place to set a relative max speed from which
-  // other functions would calibrate.
-  // Scale limit is arduino PWM of 0-255.
-  // This may need to become a per-function setting
-  int maxSpeed = 150;
 
-  ////////////////////////////////////////////////////////////////////////
-  // initialize PID variables we're linked to
-  PIDinput = qtra.readLine(sensorValues); // 
-  PIDsetpoint = 3500;                     // attempt to stay centered over line
-  //myPID.SetOutputLimits(-90,90);              // set output limits
-  myPID.SetOutputLimits(-255,255);
-  myPID.SetMode(AUTOMATIC);               // turn the PID on
-
-  ////////////////////////////////////////////////////////////////////////
-  /* moved to calibrateIRarray function
-  // calibrate IR array (might move this into a function later)
-  delay(500);
-  int i;
-  
-  Serial.println("Running calibration (see the blinky red light)?");
-  for (i = 0; i < 200; i++)      // run calibration for a few seconds
-  {
-    digitalWrite(ledPin, HIGH);  // turn on LED (flicker LED during calibration)
-    delay(20);
-    qtra.calibrate();            // reads all sensors 10 times at 2.5 ms per six sensors (i.e. ~25 ms per call)
-    digitalWrite(ledPin, LOW);   // turn off LED
-    delay(20);
-  }
-  digitalWrite(ledPin, LOW);     // turn off LED to indicate we are through with calibration
-  // print the calibration MINimum values measured when emitters were on
-  for (i = 0; i < NUM_SENSORS; i++)
-  {
-    Serial.print(qtra.calibratedMinimumOn[i]);
-    Serial.print(' ');
-  }
-  Serial.println();
-  // print the calibration MAXimum values measured when emitters were on
-  for (i = 0; i < NUM_SENSORS; i++)
-  {
-    Serial.print(qtra.calibratedMaximumOn[i]);
-    Serial.print(' ');
-  }
-  Serial.println();
-  Serial.println();
-  delay(1000);
-  ////////////////////////////////////////////////////////////////////////
-  // call pause function at end of setup to wait for button push
-  pause(); 
-  */ //moved to calibrateIRarray function
-  
-} //end of void setup
 
 ////////////////////////////////////////////////////////////////////////
+// Main loop
 void loop()
-////////////////////////////////////////////////////////////////////////
 {
-  /*
-  /////Serial.println ("Starting void loop");
-  /////navigationLogicA();     // has 3 conditions: straight, turn left, turn right
-  /////navigationLogicB();     // has 7 states with varying motor responses
-  /////navigationLogicC();       // uses PID library
-  /////navigationLogicD();     // lookup tables, basically
-  /////navigationLogicE();     // basic PID (non library) implementation
-  /////diagnosticDrive(5); 
-  /////PIDTestNoMotors();
-  */
-  
-  // Polyathlon Events
-  
-  // A) Basic Line Follower
-  // B) Advanced Line Follower
-  //navigationLogicF();     // uses PID library, after Balance Beam project
-  
-  // C) Beacon Killer
-  // D) Beacon Killer with obstacles
-  // E) Navigation by dead reckoning
-  //deadReckoning();
-  // F) Bulldozer
-  bulldozer();
-  
-  // Diagnostic Functions
-  //navigationSensorTest(); // display reflectance sensor array reading
-  //DIAGPushButtonsAndLEDs(); // cycle LEDs and check for button pushes
-  
-} //end of void loop
+  if (TestRuns == 0){
+    delay(3000);
+    calibrateIRarray();
+    pause();
+  }  
+
+  //testNXTShield();             // basic test/demo of NXTShield driving two NXT servos
+  //testBlueToothSerial();       // basic test/demo of Parallax BlueTooth Module RN-42
+  //calibrateIRarray();
+  lineFollowerMode();
+
+  // check for test run length
+  TestRuns++;
+  if ( TestRuns > 80000 ){       // Usually 4000 for testing. Change to big number before competition !!!
+    allStop(); 
+    delay(5000);
+    TestRuns = 0;
+  }
+
+} // close void loop()
+
+
 
 ////////////////////////////////////////////////////////////////////////
 /* FUNCTIONS  */
 ////////////////////////////////////////////////////////////////////////
 
-int DIAGPushButtonsAndLEDs(){
-  // flash all LEDs until a button is pushed, then walk left or right depending on button
-  buttonState = digitalRead(buttonPin);
-  buttonStateB = digitalRead(buttonPinB);
-  while (buttonState == HIGH && buttonStateB == HIGH){
-    buttonState = digitalRead(buttonPin);
-    buttonStateB = digitalRead(buttonPinB);
-    digitalWrite(ledPin, HIGH);    // turn on LED (slow blink waiting)
-    delay(150);
-    digitalWrite(ledPinBin0, HIGH);
-    delay(150);
-    digitalWrite(ledPinBin1, HIGH);
-    delay(150);
-    digitalWrite(ledPinBin2, HIGH);
-    delay(150);
-    digitalWrite(ledPinBin3, HIGH);
-    delay(150);
-    digitalWrite(ledPinFL, HIGH);
-    delay(150);
-    digitalWrite(ledPinFR, HIGH);
-    delay(150);
-    digitalWrite(ledPinRL, HIGH);
-    delay(150);
-    digitalWrite(ledPinRR, HIGH);
-    delay(300);
-    digitalWrite(ledPin, LOW);     // turn off LED
-    digitalWrite(ledPinBin0, LOW);
-    digitalWrite(ledPinBin1, LOW);
-    digitalWrite(ledPinBin2, LOW);
-    digitalWrite(ledPinBin3, LOW);
-    digitalWrite(ledPinFL, LOW);
-    digitalWrite(ledPinFR, LOW);
-    digitalWrite(ledPinRL, LOW);
-    digitalWrite(ledPinRR, LOW);
-    delay(300);
-  }
-  delay(5000);   // a button was pressed to leave the blinking loop, so wait 5 seconds and resume
+
+int testNXTShield(){
+
+  // BACKWARD at full speed for 2 seconds
+  Serial.println("BACKWARD for 2 seconds");
+  Motor1.move(BACKWARD, 255);
+  Motor2.move(BACKWARD, 255);
+  delay(2000);
+
+  // FORWARD at full speed for 2 seconds
+  Serial.println("FORWARD for 2 seconds");
+  Motor1.move(FORWARD, 255);
+  Motor2.move(FORWARD, 255);
+  delay(2000);
+
+  // Stop both motors for 2 seconds
+  Serial.println("Stop for 2 seconds");
+  Motor1.stop();
+  Motor2.stop();
+  delay(2000);
+
+  // Rotate 360 degrees (one resolution) and coast motors
+  Serial.println("Coast");
+  Motor1.move(BACKWARD, 255, 360, COAST);
+  Motor2.move(BACKWARD, 255, 360, COAST);
+  while (Motor1.isTurning() || Motor2.isTurning()); // Wait until it has reached the position
+  delay(2000);
+
+  // Rotate 360 degrees (one resolution) and brake motors
+  Serial.println("Brake");
+  Motor1.move(FORWARD, 255, 360, BRAKE);
+  Motor2.move(FORWARD, 255, 360, BRAKE);
+  while (Motor1.isTurning() || Motor2.isTurning()); // Wait until it has reached the position
+  delay(2000);
   
-} // close DIAG-PushButtonsAndLEDs function
-
-int pause(){
-  // standby until momentary button is pressed
-  // useful after calibration is complete, but before the event starts
-  allStop(); // probably not necessary but may use in future
-  buttonState = digitalRead(buttonPin);
-  // buttsonState is HIGH while untouched, pressed button causes LOW
-    while(buttonState == HIGH){
-    buttonState = digitalRead(buttonPin);
-    digitalWrite(ledPin, HIGH);    // turn on LED (slow blink waiting)
-    delay(250);
-    digitalWrite(ledPin, LOW);     // turn off LED
-    delay(250); 
-  }
-  Serial.println("Button pressed! Start 5 second delay...");
-  delay(5000);
-  Serial.println("Time's up! Leaving pause loop.");
-}
-
-
-int allStop(){
-  // turn off drive motors
-  Serial.println("allStop - stopping both motors");
-  leftMotor.stop();
-  rightMotor.stop();
-}
- 
-
-int driveForward(int speedMotorA, int speedMotorB){
-  // based on testing data, motorA/right.motor is slightly more powerful
-  // should shave about 7% off motorA's power
-  //Serial.print("speedMotorA converted from ");
-  //Serial.print(speedMotorA);
-  //Serial.print(" to ");
-  speedMotorA = speedMotorA * .93;
-  //Serial.print(speedMotorA);
-  //
-  // Amping up the power a little without changing values in navigationLogicC
-  speedMotorA = speedMotorA * 1.5;
-  speedMotorB = speedMotorB * 1.5;
-  //
-  Serial.print("driveForward function: ");
-  Serial.print(speedMotorA);
-  Serial.print(" ");
-  Serial.print(speedMotorB);
-  // function accepts two arguments: speed for motorA, motorB
-  // future args may include specific time to run
-  // or distance to cover (if using wheel encoder)
-  leftMotor.move(forward, speedMotorA);
-  rightMotor.move(forward, speedMotorB);
-}
-
-int driveBackward(int speedMotorA, int speedMotorB){
-  // function accepts two args: speed for motorA, motorB
-  // future args may include specific time to run
-  // or distance to cover (for use with countable wheels)
-  leftMotor.move(backward, speedMotorA);
-  rightMotor.move(backward, speedMotorB);
-}
-
-int diagnosticDrive(int secondsToDrive){
-  // drive forward for secondsToDrvie seconds
-  //motorA is passenger side, motorB is driver side
-  driveForward(135,150);
-  delay(5000); // hardcoding 5 seconds for now
-  allStop();
-  delay(50000);
-}
+}  // close testNXTShield function
 
 
 ////////////////////////////////////////////////////////////////////////
-int PIDTestNoMotors(){
-  
-  if (TestRuns == 0){
-    Serial.println("PID tunings: x,y,z");                                         //   <<< Change PID here 2/2 <<<<
-    Serial.println("PIDsetpoint LinePosition PIDoutput PIDoutputMapped");
-  }  
-  PIDinput = qtra.readLine(sensorValues);
-  myPID.Compute();
-  PIDoutputMapped = map(PIDoutput, 0, 255, 0, 255);
-  //PIDoutputConstrained = constrain (PIDoutputMapped, 0, 255); // constrain values so servo won't tear up the rig
-  //myservo.write(PIDoutputConstrained);
-  delay(25); // Provide time for screen scrolling
-  Serial.print(PIDsetpoint);
-  Serial.print(" ");
-  Serial.print(PIDinput);
-  Serial.print(" ");
-  Serial.print(PIDoutput);
-  Serial.print(" ");
-  Serial.println(PIDoutputMapped);
-  TestRuns++;
-  if ( TestRuns > 2000 ){
-    Serial.print(TestRuns);
-    Serial.println(" TestRuns complete. Pausing for 2 minutes...");
-    Serial.println(" ");
-    delay(120000);
-    TestRuns = 0;
+int testIRarray(){
+  // read in IR sensor values and print the values on a line
+  int i;
+  qtra.readLine(sensorValues);
+  for (i = 0; i < NUM_SENSORS; i++)
+  {
+    Serial.print(sensorValues[i]);
+    Serial.print(' ');
   }
-} // close PIDTestNoMotors function
+  Serial.println(' ');
+}  // close testIRarray
+
+
+////////////////////////////////////////////////////////////////////////
+int testBlueToothSerial(){
+  Serial.println("Entering testBlueToothSerial function");
+  Serial3.println("TX test: 0123456789");
+  delay(2000);
+}  // close testBlueToothSerial
 
 
 ////////////////////////////////////////////////////////////////////////
 int calibrateIRarray(){
-    // calibrate IR array (might move this into a function later)
-    delay(500);
     int i;
   
     Serial.println("Running calibration (see the blinky red light)?");
-    for (i = 0; i < 200; i++)      // run calibration for a few seconds
+    Serial3.println("Running calibration (see the blinky red light)?");
+    for (i = 0; i < 100; i++)      // run calibration for a few seconds (reduced from 200 to 100)
     {
       digitalWrite(ledPin, HIGH);  // turn on LED (flicker LED during calibration)
       delay(20);
@@ -379,395 +218,306 @@ int calibrateIRarray(){
     for (i = 0; i < NUM_SENSORS; i++)
     {
       Serial.print(qtra.calibratedMinimumOn[i]);
+      Serial3.print(qtra.calibratedMinimumOn[i]);
       Serial.print(' ');
+      Serial3.print(' ');
     }
     Serial.println();
+    Serial3.println();
     // print the calibration MAXimum values measured when emitters were on
     for (i = 0; i < NUM_SENSORS; i++)
     {
       Serial.print(qtra.calibratedMaximumOn[i]);
+      Serial3.print(qtra.calibratedMaximumOn[i]);
       Serial.print(' ');
+      Serial3.print(' ');
     }
-    Serial.println();
-    Serial.println();
-    delay(1000);
-    ////////////////////////////////////////////////////////////////////////
-    // call pause function at end of setup to wait for button push
-    pause(); 
+    Serial.println("Leaving calibrateIRarray function");
+    Serial3.println("Leaving calibrateIRarray function");
 } // close calibrateIRarray function
 
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int navigationLogicF(){
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  
-  if (TestRuns == 0){
-    calibrateIRarray();
-    Serial.println("PID tunings: .2-0-.05");                                         //   <<< Change PID here 2/2 <<<<
-    Serial.println("PIDsetpoint LinePosition PIDoutput speedMotorA speedMotorB");
-  }  
-  
-  PIDinput = qtra.readLine(sensorValues);
-  myPID.Compute();
-  //delay(25); // Provide time for screen scrolling
-  Serial.print(PIDsetpoint);
-  Serial.print(",");
-  Serial.print(PIDinput);
-  Serial.print(",");
-  Serial.print(PIDoutput);
-  Serial.print(",");
-  //Serial.println(PIDoutputMapped);
-  
-  
-  if ( PIDoutput < 0 ){
-    PIDoutputABS=abs(PIDoutput); // convert to absolute value
-    speedMotorB = 200;
-    speedMotorA = map(PIDoutputABS, 255, 0, 50, 200);
-    Serial.print(speedMotorA);
-    Serial.print(",");
-    Serial.print(speedMotorB);
-    speedMotorB = speedMotorB * .93;
-    leftMotor.move(forward, speedMotorA);
-    rightMotor.move(forward, speedMotorB);
+////////////////////////////////////////////////////////////////////////
+int pause(){
+  Serial.println("entering pause function");
+  Serial3.println("entering pause function");
+  // standby until momentary button is pressed
+  // useful after calibration is complete, but before the event starts
+  allStop();
+  buttonStateA = digitalRead(buttonPinA);
+  // buttsonState is HIGH while untouched, pressed button causes LOW
+  while(buttonStateA == HIGH){
+    buttonStateA = digitalRead(buttonPinA);
+    digitalWrite(ledPin, HIGH);    // turn on LED (slow blink waiting)
+    delay(250);
+    digitalWrite(ledPin, LOW);     // turn off LED
+    delay(250); 
   }
-    if ( PIDoutput > 0 ){
-    speedMotorA = 200;
-    speedMotorB = map(PIDoutput, 255, 0, 50, 200);
-    Serial.print(speedMotorA);
-    Serial.print(",");
-    Serial.print(speedMotorB);
-    speedMotorB = speedMotorB * .93;
-    leftMotor.move(forward, speedMotorA);
-    rightMotor.move(forward, speedMotorB);
-  }
-  
-/*  
-  // Checking for need of advanced navigation
-  if (sensorValues[0] > 700 | sensorValues[7] > 700){  // If one of the outside sensors detects black, go into advanced navigation mode
-    // proceed straight until all white or 2" -whichever comes first
-    // if 2"     
-    
-  }
-*/
+  Serial.println("Button A pressed! Start 5 second delay...");
+  Serial3.println("Button A pressed! Start 5 second delay...");
+  delay(5000);
+  Serial.println("Time's up! Leaving pause loop.");
+  Serial3.println("Time's up! Leaving pause loop.");
+}
 
-  // check for all black
-  if (sensorValues[0] > 700 && sensorValues[1] > 700 && sensorValues[2] > 700 && sensorValues[3] > 700 && sensorValues[4] > 700 && sensorValues[5] > 700 && sensorValues[6] > 700 && sensorValues[7] > 700)
-  {
-    Serial.println(" ");
-    Serial.println(" Whoa! Everything looks black!");
-    // assume an intersection and proceed for a brief moment. If still all black, stop.
-    var=0;
-    while(var < 150){
-      Serial.println("going forward on black");
-      var++;
-    }
-  }
-
-  // check for sharp right
-  if (sensorValues[0] > 700 && sensorValues[1] > 700) {
-    Serial.println("probably sharp right");
-    PIDinput = 0;
-    // proceed 90 degrees (2")
-    speedMotorA = 150;
-    speedMotorB = 150;
-    speedMotorB = speedMotorB * .93;
-    leftMotor.move(forward, speedMotorA, 90, coast);
-    rightMotor.move(forward, speedMotorB, 90, coast);
-    // if all white, rotate right to 2000
-    if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80){
-      while ( PIDinput < 3000 ){    // no need to rotate all the way back to 3500, just get to 2000 and resume PID. Actually, 3000 might be safer.
-        speedMotorA = 130; // 120 worked well
-        speedMotorB = 130;
-        speedMotorB = speedMotorB * .93;
-        leftMotor.move(forward, speedMotorA);
-        rightMotor.move(backward, speedMotorB);
-        PIDinput = qtra.readLine(sensorValues);
-      }
-    }
-  }
-    
-    /*
-    // if this is an intersection, we'll end up on the other side and resume PID
-    // if this is a hard right or switchback, the right pivot should get us back on track (or exit quickly if on a good line)
-    Serial.println("sharp turn noticed, punch through until white");
-    var=0;
-    //while(var < 500){  // punch through of 20 too low if battery is low and bot is really slow.
-    while (sensorValues[0] > 700 | sensorValues[1] > 700 | sensorValues[2] > 700 | sensorValues[3] > 700 | sensorValues[4] > 700 | sensorValues[5] > 700 | sensorValues[6] > 700 | sensorValues[7] > 700){      Serial.println("punch");
-      speedMotorA = 125;
-      speedMotorB = 125;
-      speedMotorB = speedMotorB * .93;
-      leftMotor.move(forward, speedMotorA);
-      rightMotor.move(forward, speedMotorB);
-      //PIDinput = qtra.readLine(sensorValues); Since this punch was tripped by 3 right sensors, 
-      //                                        don't want to continue updating PIDinput or a
-      //                                        switchback corner under left sensors might be the last
-      //                                        sensor read causing all white recovery to rotate
-      //                                        in the wrong direction.
-      qtra.readLine(sensorValues);  //read sensors here to update array
-      PIDinput = 0; // seed PIDouput so all white will result in right turn      
-      var++;
-    }
-    var=0;
-    while(var < 25){
-      Serial.println("punch a little more to fully clear the line");
-      speedMotorA = 125;
-      speedMotorB = 125;
-      speedMotorB = speedMotorB * .93;
-      leftMotor.move(forward, speedMotorA);
-      rightMotor.move(forward, speedMotorB);
-      var++;
-    }
-
-    // after punch through, start rotating right
-    while ( PIDinput < 2000 ){
-      speedMotorA = 110; // 120 worked well
-      speedMotorB = 110;
-      leftMotor.move(forward, speedMotorA);
-      rightMotor.move(backward, speedMotorB);
-      PIDinput = qtra.readLine(sensorValues);
-    }
-    */
-  
-  // check for sharp left
-  if (sensorValues[7] > 700 && sensorValues[6] > 700) {
-    Serial.println("probably sharp left");
-    PIDinput = 7000;
-    // proceed 90 degrees (2")
-    speedMotorA = 150;
-    speedMotorB = 150;
-    speedMotorB = speedMotorB * .93;
-    leftMotor.move(forward, speedMotorA, 90, coast);
-    rightMotor.move(forward, speedMotorB, 90, coast);
-    // if all white, rotate left to 5000
-    if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80){
-      while ( PIDinput > 4000 ){    // no need to rotate all the way back to 3500, just get to 5000 and resume PID. Actually, 4000 might be safer.
-        speedMotorA = 130; // 120 worked well
-        speedMotorB = 130;
-        speedMotorB = speedMotorB * .93;
-        leftMotor.move(backward, speedMotorA);
-        rightMotor.move(forward, speedMotorB);
-        PIDinput = qtra.readLine(sensorValues);
-      }
-    }
-  }
-    // resume PID
-    
-    
-    
-    /*
-    Serial.println("sharp left turn noticed, until all white, then punch through just a little more");
-    var=0;
-    //while(var < 500){ // punch through of 20 too low if battery is low and bot is really slow.   Why not punch through until all white? because the go until white hurts intersection performance
-    // ...unless we could set a max punch of 2 inches, then 213
-    while (sensorValues[0] > 700 | sensorValues[1] > 700 | sensorValues[2] > 700 | sensorValues[3] > 700 | sensorValues[4] > 700 | sensorValues[5] > 700 | sensorValues[6] > 700 | sensorValues[7] > 700){
-      Serial.println("punch");
-      speedMotorA = 125;
-      speedMotorB = 125;
-      speedMotorB = speedMotorB * .93;
-      leftMotor.move(forward, speedMotorA);
-      rightMotor.move(forward, speedMotorB);
-      //PIDinput = qtra.readLine(sensorValues); Since this punch was tripped by 3 left sensors,
-      //                                        don't want to continue updating PIDinput or a
-      //                                        switchback corner under right sensors might be the last
-      //                                        sensor read causing all white recovery to rotate
-      //                                        in the wrong direction.
-      qtra.readLine(sensorValues);  //read sensors here to update array for white checking
-      PIDinput = 7000; // seed PIDouput so all white will result in left turn
-      var++;
-    }
-    var=0;
-    while(var < 25){
-      Serial.println("punch a little more to fully clear the line before rotating");
-      speedMotorA = 125;
-      speedMotorB = 125;
-      speedMotorB = speedMotorB * .93;
-      leftMotor.move(forward, speedMotorA);
-      rightMotor.move(forward, speedMotorB);
-      var++;
-    }
-    // after punch through, start rotating left
-    while ( PIDinput > 5000 ){
-      speedMotorA = 110; // 120 worked well
-      speedMotorB = 110;
-      speedMotorB = speedMotorB * .93;
-      leftMotor.move(backward, speedMotorA);
-      rightMotor.move(forward, speedMotorB);
-      PIDinput = qtra.readLine(sensorValues);
-    }
-    */
-  
-  // check for all white. If the robot is using this, it's a probably a bad sign
-  if (sensorValues[0] < 80 && sensorValues[1] < 80 && sensorValues[2] < 80 && sensorValues[3] < 80 && sensorValues[4] < 80 && sensorValues[5] < 80 && sensorValues[6] < 80 && sensorValues[7] < 80)
-  {
-    Serial.println(" ");
-    Serial.println(" Whoa! Everything looks white!");
-    // we've lost the line. swing towards last known good location
-    if ( PIDinput <= 3500 ) {
-      Serial.println("Lost line off to our right. Swing right to find");
-      // maybe add a while loop to swing right until PIDinput >5000 to ensure a long enough swing on switchbacks
-      speedMotorA = 150; // 120 worked well
-      speedMotorB = 150;
-      leftMotor.move(forward, speedMotorA);
-      rightMotor.move(backward, speedMotorB);
-      PIDinput = qtra.readLine(sensorValues);
-    }
-    if (PIDinput > 3500) {
-      Serial.println("Lost line off to our left. Swing left to find");
-      speedMotorA = 150;
-      speedMotorB = 150;
-      leftMotor.move(backward, speedMotorA);
-      rightMotor.move(forward, speedMotorB);
-      PIDinput = qtra.readLine(sensorValues);
-    }
-  }
-  
-  // check for test run length
-  TestRuns++;
-  if ( TestRuns > 8000 ){
-    allStop(); 
-    Serial.print(TestRuns);
-    Serial.println(" TestRuns complete. Pausing for 2 minutes...");
-    Serial.println(" ");
-    pause();
-    TestRuns = 0;
-  }
-} // close PIDTestNoMotors function
 
 ////////////////////////////////////////////////////////////////////////
-int deadReckoning(){
-  Serial.println("Entering deadReckoning function");
-  pause();
-  // Goal: Drive clockwise around an equalateral triangle with 4' sides. Return to same starting point.
-  // 360 degrees of wheel resolution should be approximately 7.75” of travel distance
-  // 4' = 48”
-  // 48” / 7.75” = 6.193548387
-  // 6.193548387 * 360 = 2229.677419355
-  // 2229.677419355 / 4 = 557.419354839 (break the leg into 4 smaller segments)
-  
-  // Leg 1
-  var=0;
-  while(var<1){
-    speedMotorA = 150;
-    speedMotorB = 150;
-    speedMotorB = speedMotorB * .97; // .97 at 150 with new battery worked well
-    leftMotor.move(forward, speedMotorA, 2220, brake);
-    rightMotor.move(forward, speedMotorB, 2220, brake);
-    delay(10000);
-    var++;
-  }
-  Serial.println("pausing...");
-  //pause();
-  
-  // Rotate right 120 degrees
-  leftMotor.move(forward, speedMotorA, 230, brake);
-  rightMotor.move(backward, speedMotorB, 230, brake);
-  delay(3000);
-  //pause();
-  
-  // Leg 2
-  var=0;
-  while(var<1){
-    speedMotorA = 150;
-    speedMotorB = 150;
-    speedMotorB = speedMotorB * .97; // .97 at 150 with new battery worked well
-    leftMotor.move(forward, speedMotorA, 2220, brake);
-    rightMotor.move(forward, speedMotorB, 2220, brake);
-    delay(10000);
-    var++;
-  }  
-  pause();
-  // Rotate right 120 degrees
-  leftMotor.move(forward, speedMotorA, 230, brake);
-  rightMotor.move(backward, speedMotorB, 230, brake);
-  delay(3000);
-  //pause();
-  
-  // Leg 3
-  var=0;
-  while(var<1){
-    speedMotorA = 150;
-    speedMotorB = 150;
-    speedMotorB = speedMotorB * .97; // .97 at 150 with new battery worked well
-    leftMotor.move(forward, speedMotorA, 2220, brake);
-    rightMotor.move(forward, speedMotorB, 2220, brake);
-    delay(10000);
-    var++;
-  }
-  
-  // Rotate right 120 degrees
-  leftMotor.move(forward, speedMotorA, 230, brake);
-  rightMotor.move(backward, speedMotorB, 230, brake);
-  delay(3000);
-  //pause();
-  
-} // close deadReckoning function
-
-////////////////////////////////////////////////////////////////////////
-int getPingDistances(){
-  long duration, inches, cm;
-
-  pinMode(pingPinA, OUTPUT);
-  digitalWrite(pingPinA, LOW);
-  delayMicroseconds(2);              // original value: 2
-  digitalWrite(pingPinA, HIGH);
-  delayMicroseconds(5);              // original value: 5
-  digitalWrite(pingPinA, LOW);
-  pinMode(pingPinA, INPUT);
-  duration = pulseIn(pingPinA, HIGH);
-  inches = microsecondsToInches(duration);
-  delay(20);                         // Setting too low seemed to introduce issues. Too much ping noise in tube?
-  Serial.print("pingPin[A,B,C] inches: ");
-  Serial.print(inches);
-  
-  pinMode(pingPinB, OUTPUT);
-  digitalWrite(pingPinB, LOW);
-  delayMicroseconds(2);              // original value: 2
-  digitalWrite(pingPinB, HIGH);
-  delayMicroseconds(5);              // original value: 5
-  digitalWrite(pingPinB, LOW);
-  pinMode(pingPinB, INPUT);
-  duration = pulseIn(pingPinB, HIGH);
-  inches = microsecondsToInches(duration);
-  delay(20);                         // Setting too low seemed to introduce issues. Too much ping noise in tube?
-  Serial.print(" ");
-  Serial.print(inches);
-  
-  pinMode(pingPinC, OUTPUT);
-  digitalWrite(pingPinC, LOW);
-  delayMicroseconds(2);              // original value: 2
-  digitalWrite(pingPinC, HIGH);
-  delayMicroseconds(5);              // original value: 5
-  digitalWrite(pingPinC, LOW);
-  pinMode(pingPinC, INPUT);
-  duration = pulseIn(pingPinC, HIGH);
-  inches = microsecondsToInches(duration);
-  delay(20);                         // Setting too low seemed to introduce issues. Too much ping noise in tube?
-  Serial.print(" ");
-  Serial.println(inches);
-
-  return inches;  
-} // close getPingDistances function
-
-////////////////////////////////////////////////////////////////////////
-long microsecondsToInches(long microseconds)
-{
-  // According to Parallax's datasheet for the PING))), there are
-  // 73.746 microseconds per inch (i.e. sound travels at 1130 feet per
-  // second).  This gives the distance travelled by the ping, outbound
-  // and return, so we divide by 2 to get the distance of the obstacle.
-  // See: http://www.parallax.com/dl/docs/prod/acc/28015-PING-v1.3.pdf
-  return microseconds / 74 / 2;
+int allStop(){                                  // turn off drive motors
+  Serial.println("allStop - stopping both motors");
+  Motor1.stop();
+  Motor2.stop();
 }
 
 ////////////////////////////////////////////////////////////////////////
-long microsecondsToCentimeters(long microseconds)
-{
-  // The speed of sound is 340 m/s or 29 microseconds per centimeter.
-  // The ping travels out and back, so to find the distance of the
-  // object we take half of the distance travelled.
-  return microseconds / 29 / 2;
+int lineFollowerMode(){                  // bot acts like a line follower
+  
+  nodeType = checkForNode();
+  
+  switch (nodeType) {
+    case 3:
+      // Although nice to know we passed a 4-way intersection, we've already
+      // passed it by this point due to evaluating the intersection.
+      // So, just continue following the line
+      followLine();
+      // TODO move following to separate function
+      // proceed 1" (8" wheel circumference = 45 degrees per inch)
+      //Motor1.move(BACKWARD, 100, 45, COAST);
+      //Motor2.move(BACKWARD, 100, 45, COAST);
+      //Motor1.move(BACKWARD, 100, 45, BRAKE);
+      //Motor2.move(BACKWARD, 100, 45, BRAKE);
+      //while (Motor1.isTurning() || Motor2.isTurning()); // Wait until it has reached the position
+      //delay(3000); // this delay for testing purposes. TODO remove it later
+      break;
+    default:
+      followLine();
+  }
+  
+} // close lineFollowerMode
+
+
+////////////////////////////////////////////////////////////////////////
+int followLine(){                  // Using PD calculations instead of PID library
+  
+  //unsigned int sensors[8]; // delete after confirmed working
+  int position = qtra.readLine(sensorValues); // get calibrated readings along with the line position, refer to the QTR Sensors Arduino Library for more details on line position.
+  int error = position - 3500;
+
+  int motorSpeed = Kp * error + Kd * (error - lastError);
+  lastError = error;
+
+  int rightMotorSpeed = rightBaseSpeed + motorSpeed;
+  int leftMotorSpeed = leftBaseSpeed - motorSpeed;
+  
+  if (rightMotorSpeed > rightMaxSpeed ) rightMotorSpeed = rightMaxSpeed; // prevent the motor from going beyond max speed
+  if (leftMotorSpeed > leftMaxSpeed ) leftMotorSpeed = leftMaxSpeed; // prevent the motor from going beyond max speed
+  if (rightMotorSpeed < 0) rightMotorSpeed = 0; // keep the motor speed positive
+  if (leftMotorSpeed < 0) leftMotorSpeed = 0; // keep the motor speed positive
+
+
+  speedMotorA = leftMotorSpeed;
+  speedMotorB = rightMotorSpeed;
+  Motor1.move(BACKWARD, speedMotorA);
+  Motor2.move(BACKWARD, speedMotorB);
+
+} // close followLine
+
+
+////////////////////////////////////////////////////////////////////////
+int checkForNode(){
+
+  Serial.println("Entering checkForNode function");
+  int position = qtra.readLine(sensorValues); // initalize position in this scope
+  
+  // Evaluate IR sensor array readings to identify potential nodes or intersections.
+  // If sensor readings suggest bot has encountered a node, this function may perform
+  // manual maneuvers to obtain more information about the current line configuration.
+  //
+  //
+  // This function returns a value to indicate type of node detected.
+  // 
+  // Returned values and their meaning
+  //
+  //      ---- need these for line following ----
+  //   0  no node detected
+  //   1  four way intersection (bot can turn left, right, or continue straight)
+  //
+  //      ---- need these for maze solving ----
+  //   2  black square (finish box for maze solving)
+  //   3  dead end T intersection (bot can turn left or right)
+  //   4  right hand T intersection (bot can turn right or continue straight)
+  //   5  left hand T intersection (bot can turn left or continue straight)
+  //   6  dead end line (bot must stop or complete a U-turn)
+  //
+  //      ---- need these for advanced line following ----
+  //   7  right hand switchback
+  //   8  left hand switchback
+  //
+  //      ---- need these for more efficient line following (tighter turns),          ----
+  //      ---- and more efficient maze solving (tighter turns AND coordinate capture) ----
+  //   9  90 degree right turn (bot can only turn right) need to identify such nodes for building a coordinate grid of a maze
+  //  10  90 degree left turn (bot can only turn left) need to identify such nodes for building a coordinate grid of a maze
+  //
+  //
+  //   TODO return net x,y changes so dead reckoning algorithms know what this function did to the bot's position
+  // 
+  //   notes:
+  //   only middle four sensors seemed to get tripped by a 90 degree turn when bot was already leaning into the turn
+
+  // take an IR reading
+  Serial.println("taking an IR reading");
+  qtra.readLine(sensorValues);
+
+  // print the IR values
+  int i;
+  for (i = 0; i < NUM_SENSORS; i++)
+  {
+    Serial.print(sensorValues[i]);
+    Serial.print(' ');
+  }
+
+  ////////////////////////////////////////////////
+  // check for intersections 1, 2, or 3
+  if (sensorValues[1] > IRblack && sensorValues[2] > IRblack && sensorValues[3] > IRblack && sensorValues[4] > IRblack && sensorValues[5] > IRblack && sensorValues[6] > IRblack)
+  {
+    // If reading black across the 6 middle QTR-8A sensors, we might be facing one of three things
+    // four way intersection (return 1)
+    // black finish square (return 2)
+    // dead end T intersection (return 3)
+    //
+    // This implementation is basic since it requires careful control of distance moved between each IR reading
+    // TODO find a method that can track IR readings across time (actually, across distances via wheel encoders)
+    // in order to avoid having to stop the bot to identify intersection types.
+    //
+    Serial.println("Intersection?");
+    Serial3.println("Intersection?");
+    allStop();
+    //delay(500);
+    // proceed 1" (8" wheel circumference = 45 degrees per inch)
+    Motor1.move(BACKWARD, 100, 45, BRAKE);
+    Motor2.move(BACKWARD, 100, 45, BRAKE);
+    //while (Motor1.isTurning() || Motor2.isTurning()); // Wait until it has reached the position
+    delay(250);
+    Serial.println(" - check for 4-way intersection");
+    Serial3.println(" - check for 4-way intersection");
+    qtra.readLine(sensorValues);
+
+    if ((sensorValues[0] < IRwhite && sensorValues[7] < IRwhite) && (sensorValues[3] > IRblack || sensorValues[4] > IRblack)){
+      // outer sensors see white and at least one of the middle sensors sees black
+        Serial.println(" - Yep, it's a 4-way intersection");
+        Serial3.println(" - Yep, it's a 4-way intersection");
+        return 1;  
+    }
+    Serial.println(" - Well, it's not a 4-way intersection, check for finish square");
+    Serial3.println(" - Well, it's not a 4-way intersection, check for finish square");
+    
+    if (sensorValues[1] > IRblack && sensorValues[2] > IRblack && sensorValues[3] > IRblack && sensorValues[4] > IRblack && sensorValues[5] > IRblack && sensorValues[6] > IRblack)
+    {
+      // proceed 1" (8" wheel circumference = 45 degrees per inch)
+      Motor1.move(BACKWARD, 100, 45, BRAKE);
+      Motor2.move(BACKWARD, 100, 45, BRAKE);
+      //while (Motor1.isTurning() || Motor2.isTurning()); // Wait until it has reached the position
+      delay(250);        // debugging, remove later? (might need to give previous movement a chance to finish?)
+      Serial.println(" - check for finish square again");
+      Serial3.println(" - check for finish square again");
+      qtra.readLine(sensorValues);
+      if (sensorValues[1] > IRblack && sensorValues[2] > IRblack && sensorValues[3] > IRblack && sensorValues[4] > IRblack && sensorValues[5] > IRblack && sensorValues[6] > IRblack)
+      {
+        Serial.println(" - Yep, it's a finish square");
+        Serial3.println(" - Yep, it's a finish square");
+        delay(10000); // TODO remove this debugging delay
+        return 2;
+        // TODO I guess bot should check for continuing line (we just crossed a thick cross street?) or all white and recover
+      }
+      Serial.println(" - Wierd, thought I might be in the finish square, but maybe I re-read the cross line too fast?");
+      Serial3.println(" - Wierd, thought I might be in the finish square, but maybe I re-read the cross line too fast?");
+      // Epiphiny, this where I realized I'll either need to stop and take very careful IR readings while advancing specific known distances
+      // OR, remember multiple IR array readings over time (encoder ticks) and compare. AND handle row stretching across time.
+      return 1;
+    }
+
+    Serial.println(" - check for dead end T intersection");
+    Serial3.println(" - check for dead end T intersection");
+    if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite)
+    {
+      Serial.println(" - Yep, it's a dead end T intersection");
+      Serial3.println(" - Yep, it's a dead end T intersection");
+      return 3;
+    }
+
+  } //end of check for intersections 1, 2, and 3
+
+  ////////////////////////////////////////////////
+  // check for node 9, 90 degree right turn
+  if ((sensorValues[0] > IRblack && sensorValues[1] > IRblack) && (sensorValues[6] < IRwhite && sensorValues[7] < IRwhite)) {
+    Serial.println("Sharp right?");
+    Serial3.println("Sharp right?");
+    // proceed 90 degrees (2")
+    Motor1.move(BACKWARD, 150, 45, BRAKE);
+    Motor2.move(BACKWARD, 150, 45, BRAKE);
+    delay(250);  // debugging, remove later (might need to give previous movement a chance to finish?)
+    Serial.println(" - check again for sharp right");
+    Serial3.println(" - check again for sharp right");
+    position = qtra.readLine(sensorValues);
+    // check for all white
+    if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
+      // if all white here, rotate right until seeing line again and return 9
+      Serial.println(" - Yep, it's a sharp right. Rotate right and find line");
+      Serial3.println(" - Yep, it's a sharp right. Rotate right and find line");
+      while ( position < 1000 ){    // no need to rotate all the way back to 3500, just get to 1000 and resume PD
+        Motor1.move(BACKWARD, 170);
+        //Motor2.move(FORWARD, 130); // comment out to just pivot, need to coordinate with "proceed 2 inches" distance above
+        position = qtra.readLine(sensorValues);
+      }      
+      allStop();    // maybe keep allstop to reduce overshoot
+      //delay(2000);  // debugging, remove later
+    }
+    return 9;
+  }
+  
+  ////////////////////////////////////////////////
+  // check for node 10, 90 degree left turn
+  if ((sensorValues[0] < IRwhite && sensorValues[1] < IRwhite) && (sensorValues[6] > IRblack && sensorValues[7] > IRblack)) {
+    Serial.println("Sharp left?");
+    Serial3.println("Sharp left?");
+    // proceed 90 degrees (2")
+    Motor1.move(BACKWARD, 150, 45, BRAKE);
+    Motor2.move(BACKWARD, 150, 45, BRAKE);
+    delay(250);  // debugging, remove later (might need to give previous movement a chance to finish?)
+    Serial.println(" - check again for sharp left");
+    Serial3.println(" - check again for sharp left");
+    position = qtra.readLine(sensorValues);
+    // check for all white
+    if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
+      // if all white here, rotate left until seeing line again and return 10
+      Serial.println(" - Yep, it's a sharp left. Rotate left and find line");
+      Serial3.println(" - Yep, it's a sharp left. Rotate left and find line");
+      while ( position > 5000 ){    // no need to rotate all the way back to 3500, just get to 5000 and resume PD
+        //Motor1.move(FORWARD, 130); // comment out to just pivot, need to coordinate with "proceed 2 inches" distance above
+        Motor2.move(BACKWARD, 170);
+        position = qtra.readLine(sensorValues);
+      }
+      allStop();    // maybe keep allstop to reduce overshoot
+      //delay(2000);  // debugging, remove later
+    }
+    return 10;
+  }
+
+  // no nodes detected
+  Serial.println(" No nodes detected, returning 0 (zero)");
+  return 0;
+} // close checkForNode() function
+
+
+////////////////////////////////////////////////////////////////////////
+int checkForSwitchback(){
+  // 
 }
 
-int bulldozer(){
-    getPingDistances();
-} // close bulldozer function
+////////////////////////////////////////////////////////////////////////
+int checkForEdge(){
+  // check for edge of table
+}
+
+
+
+
