@@ -412,6 +412,14 @@ int checkForNode(){
     
     if (sensorValues[1] > IRblack && sensorValues[2] > IRblack && sensorValues[3] > IRblack && sensorValues[4] > IRblack && sensorValues[5] > IRblack && sensorValues[6] > IRblack)
     {
+      Serial.println(" - Yep, it's a finish square");
+      Serial3.println(" - Yep, it's a finish square");
+      pause();  // TODO just return 2 and let the maze function do the pause()
+      return 2;
+        
+      /*  Commented out following block because I don't think it's necessary. Bot usually ends up deep enough past
+       *  the cross line that it's well within the black square. A second reading of sensor 1-6 in the black should
+       *  be enough
       // proceed 1" (8" wheel circumference = 45 degrees per inch)
       Motor1.move(BACKWARD, 100, 45, BRAKE);
       Motor2.move(BACKWARD, 100, 45, BRAKE);
@@ -433,6 +441,7 @@ int checkForNode(){
       // Epiphiny, this where I realized I'll either need to stop and take very careful IR readings while advancing specific known distances
       // OR, remember multiple IR array readings over time (encoder ticks) and compare. AND handle row stretching across time.
       return 1;
+      */
     }
 
     Serial.println(" - check for dead end T intersection");
