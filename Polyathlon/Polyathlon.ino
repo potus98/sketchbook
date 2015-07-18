@@ -312,7 +312,7 @@ int mazeSolverModeRHS(){      // bot acts like a maze solver using Right Hand Si
       break;
 
     case 1:                   // 1  - four way intersection (bot can turn left, right, or continue straight)
-      turnRight(130, 220);    //      150 motor speed
+      turnRight(115);         //      100 motor speed (130 seemed to be too fast for IR sensors to catch the line)
       break;                  //      270 degrees of rotation (6 inches of wheel travel) would be
                               //      theoretically ideal 90 degree right turn, but reduced to 250 due to extra wheel momentum
     
@@ -321,12 +321,12 @@ int mazeSolverModeRHS(){      // bot acts like a maze solver using Right Hand Si
       break;
     
     case 3:                   // 3  - dead end T intersection (bot can turn left or right)
-      turnRight(130, 220);    //      150 motor speed
+      turnRight(115);         //      100 motor speed (130 seemed to be too fast for IR sensors to catch the line)
       break;                  //      270 degrees of rotation (6 inches of wheel travel) would be
                               //      theoretically ideal, but reduced here due to extra wheel momentum
     
     case 4:                   // 4  - right hand T intersection (bot can turn right or continue straight)
-      turnRight(130, 220);
+      turnRight(115);         //      100 motor speed (130 seemed to be too fast for IR sensors to catch the line)
       break;
     
     case 5:                   // 5  - left hand T intersection (bot can turn left or continue straight)
@@ -381,6 +381,7 @@ int followLine(){                  // Using PD calculations instead of PID libra
 
 ////////////////////////////////////////////////////////////////////////
 int checkForNode(){
+  //Serial3.println("checkForNode");  // TODO remove temp debugging
   
   // Evaluate IR sensor array readings to identify potential nodes or intersections.
   // If sensor readings suggest bot has encountered a node, this function may perform
@@ -446,10 +447,15 @@ int checkForNode(){
     //Serial3.println("Intersection?");
     allStop();
     //delay(500);
-    // proceed 1" (8" wheel circumference = 45 degrees per inch)
-    Motor1.move(BACKWARD, 100, 35, BRAKE);
-    Motor2.move(BACKWARD, 100, 35, BRAKE);
+
+    
+    // proceed 1" (8" wheel circumference = 45 degrees per inch) TODO - Actually, don't think this is necessary:
+    // ...by the time the bot stops above, it has already advanced 1 to 1.5 inches beyond the original line that tripped these checks.
+    //Motor1.move(BACKWARD, 100, 35, BRAKE);
+    //Motor2.move(BACKWARD, 100, 35, BRAKE);
+    
     //while (Motor1.isTurning() || Motor2.isTurning()); // Wait until it has reached the position
+    
     delay(250);
     qtra.readLine(sensorValues);  // obtain reading after just passing over a line
     
@@ -518,6 +524,7 @@ int checkForNode(){
       // outer sensors see white and at least one of the middle sensors sees black
         //Serial.println(" - Right-handed 3-way intersection");
         //Serial3.println(" - Right-handed 3-way intersection");
+        Serial3.println("return 4");
         return 4;
     }
   }  // close check for node 9 and 4
@@ -565,7 +572,7 @@ int checkForNode(){
   // I was reading a line and now *BAM* no line whatsoever. Must be a dead end.
   if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
     allStop();
-    uTurn(130);  // TODO variablize turn speeds
+    uTurn(100);  // TODO variablize turn speeds, 130 seemed to be too fast for IR sensors to catch the line
     return 6;
   }
 
@@ -575,8 +582,29 @@ int checkForNode(){
   return 0;
 } // close checkForNode() function
 
+
 ////////////////////////////////////////////////////////////////////////
-int turnRight(int speed, int degrees){               // robot turns right by pivoting on the right wheel (only running left wheel)
+int turnRight(int speed){
+  //Serial3.println("Entering turnRight function");
+  // robot turns right by pivoting on the right wheel (only running left wheel)
+
+  // while any sensors see any black, keep turning right
+  //while (sensorValues[0] > IRblack || sensorValues[1] > IRblack || sensorValues[2] > IRblack || sensorValues[3] > IRblack || sensorValues[4] > IRblack || sensorValues[5] > IRblack || sensorValues[6] > IRblack || sensorValues[7] > IRblack){
+  // while any left side sensors see any black, keep turning right
+  while (sensorValues[4] > IRblack || sensorValues[5] > IRblack || sensorValues[6] > IRblack || sensorValues[7] > IRblack){
+    Motor1.move(BACKWARD, speed);
+    qtra.readLine(sensorValues);
+    delay(100);  // give a chance for sensors to finish reading?
+  }
+  
+  // ...then keep turning while all sensors see white
+  while (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
+    Motor1.move(BACKWARD, speed);
+    qtra.readLine(sensorValues);
+    delay(100);  // give a chance for sensors to finish reading?
+  }
+  
+  /* original turnRight code that rotated the outside wheel a certain number of degrees, then stopped.  
   //Serial.println("Entering turnRight function");
   //Serial3.println("Entering turnRight function");
   Motor1.move(BACKWARD, speed, degrees, BRAKE);
@@ -586,13 +614,32 @@ int turnRight(int speed, int degrees){               // robot turns right by piv
   // to turn 90 degrees to the right" is more intuitive than "I want my left wheel
   // to rotate 270-ish degrees to accomplish a right hand turn."
   //
-  // TODO Better yet, turn right until seeing all white, then start watching for
-  // next line.
-  
+  */ 
 } // close turnRight function
+
 
 ////////////////////////////////////////////////////////////////////////
 int turnLeft(int speed, int degrees){               // robot turns left by pivoting on the left wheel (only running right wheel)
+
+  //Serial3.println("Entering turnLeft function");
+  // robot turns left by pivoting on the left wheel (only running right wheel)
+
+  // while any sensors see any black, keep turning left
+  // while any right side sensors see any black, keep turning left
+  while (sensorValues[0] > IRblack || sensorValues[1] > IRblack || sensorValues[2] > IRblack || sensorValues[3] > IRblack){
+    Motor2.move(BACKWARD, speed);
+    qtra.readLine(sensorValues);
+    delay(100);  // give a chance for sensors to finish reading
+  }
+  
+  // ...then keep turning while all sensors see white
+  while (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
+    Motor2.move(BACKWARD, speed);
+    qtra.readLine(sensorValues);
+    delay(100);  // give a chance for sensors to finish reading
+  }
+
+  /*
   //Serial.println("Entering turnLeft function");
   //Serial3.println("Entering turnLeft function");
   Motor2.move(BACKWARD, speed, degrees, BRAKE);
@@ -601,16 +648,34 @@ int turnLeft(int speed, int degrees){               // robot turns left by pivot
   // and calculate the wheel movement necessary to accomplish. ie: "I want my bot
   // to turn 90 degrees to the left" is more intuitive than "I want my right wheel
   // to rotate 270-ish degrees to accomplish a left hand turn."
+  */
+  
 } // close turnLeft function
 
-int uTurn(int speed){                         // robot rotates 180 degrees by pivoting in place (turning wheels in opposite directions)
+int uTurn(int speed){                         // robot rotates by pivoting in place (turning wheels in opposite directions)
+  // move straight forward a tiny bit to provide more room to resume line following after completing the U-Turn manuever
+  Motor1.move(BACKWARD, speed, 130, BRAKE);
+  Motor2.move(BACKWARD, speed, 130, BRAKE);
+  delay(1200); // allow previous maneuver to complete
+  // start rotating until line position reached
+  //while (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
+  while (sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite){
+    Motor1.move(BACKWARD, speed);
+    Motor2.move(FORWARD, speed);
+    qtra.readLine(sensorValues);
+    delay(100);  // give a chance for sensors to finish reading?
+  }
+
+  /*
   //Serial.println("Entering uTurn function");
   //Serial3.println("Entering uTurn function");
   Motor1.move(BACKWARD, speed, 200, BRAKE);
   Motor2.move(FORWARD, speed, 200, BRAKE);
   delay(2000);
   allStop();
-}
+  */
+
+} // close uTurn function
 
 ////////////////////////////////////////////////////////////////////////
 int checkForSwitchback(){
@@ -621,7 +686,5 @@ int checkForSwitchback(){
 int checkForEdge(){
   // check for edge of table
 }
-
-
 
 
