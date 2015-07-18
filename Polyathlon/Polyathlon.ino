@@ -93,8 +93,11 @@ int TestRuns = 0;              // counter used to limit total number of cycles t
 int speedMotorA = 0;
 int speedMotorB = 0;
 int nodeType = 0;
-int IRwhite = 200; // any IR value smaller than this is treated as white
-int IRblack = 600; // any IR value larger than this is treated as black
+int IRwhite = 200;     // any IR value smaller than this is treated as white
+int IRblack = 600;     // any IR value larger than this is treated as black
+int turnSpeed = 115;
+int uTurnSpeed = 105;
+int nodeCheckSpeed = 120;
 
 ////////////////////////////////////////////////////////////////////////
 // Setup
@@ -123,7 +126,8 @@ void loop()
   //testBlueToothSerial();       // basic test/demo of Parallax BlueTooth Module RN-42
   //calibrateIRarray();
   //lineFollowerMode();          // bot acts like a line follower
-  mazeSolverModeRHS();           // bot acts like a maze solver using Right Hand Side algorithm
+  //mazeSolverModeRHS();         // bot acts like a maze solver using Right Hand Side algorithm
+  mazeSolverModeLHS();           // bot acts like a maze solver using Left Hand Side algorithm
 
   // check for test run length
   TestRuns++;
@@ -312,7 +316,7 @@ int mazeSolverModeRHS(){      // bot acts like a maze solver using Right Hand Si
       break;
 
     case 1:                   // 1  - four way intersection (bot can turn left, right, or continue straight)
-      turnRight(115);         //      100 motor speed (130 seemed to be too fast for IR sensors to catch the line)
+      turnRight(turnSpeed);         //      100 motor speed (130 seemed to be too fast for IR sensors to catch the line)
       break;                  //      270 degrees of rotation (6 inches of wheel travel) would be
                               //      theoretically ideal 90 degree right turn, but reduced to 250 due to extra wheel momentum
     
@@ -321,16 +325,66 @@ int mazeSolverModeRHS(){      // bot acts like a maze solver using Right Hand Si
       break;
     
     case 3:                   // 3  - dead end T intersection (bot can turn left or right)
-      turnRight(115);         //      100 motor speed (130 seemed to be too fast for IR sensors to catch the line)
+      turnRight(turnSpeed);         //      100 motor speed (130 seemed to be too fast for IR sensors to catch the line)
       break;                  //      270 degrees of rotation (6 inches of wheel travel) would be
                               //      theoretically ideal, but reduced here due to extra wheel momentum
     
     case 4:                   // 4  - right hand T intersection (bot can turn right or continue straight)
-      turnRight(115);         //      100 motor speed (130 seemed to be too fast for IR sensors to catch the line)
+      turnRight(turnSpeed);         //      100 motor speed (130 seemed to be too fast for IR sensors to catch the line)
       break;
     
     case 5:                   // 5  - left hand T intersection (bot can turn left or continue straight)
       followLine();
+      break;
+    
+    case 6:                   // 6  - dead end line (bot must stop or complete a U-turn)
+      followLine();           //      bot has already turned by this point
+      break;
+      
+    case 9:                   // 9  - 90 degree right turn (bot can only turn right) need to identify such nodes for building a coordinate grid of a maze
+      followLine();           //      bot has already turned by this point
+      break;
+    
+    case 10:                  // 10 - 90 degree left turn (bot can only turn left) need to identify such nodes for building a coordinate grid of a maze
+      followLine();           //      bot has already turned by this point
+      break;
+    
+    default:
+      followLine();
+    
+  } // close switch statement
+} // close mazeSolverModeRHS
+
+
+////////////////////////////////////////////////////////////////////////
+int mazeSolverModeLHS(){      // bot acts like a maze solver using Left Hand Side algorithm
+  nodeType = checkForNode();
+
+  switch (nodeType) {
+    case 0:                   // 0  - no node detected
+      followLine();
+      break;
+
+    case 1:                   // 1  - four way intersection (bot can turn left, right, or continue straight)
+      turnLeft(turnSpeed);         //      100 motor speed (130 seemed to be too fast for IR sensors to catch the line)
+      break;                  //      270 degrees of rotation (6 inches of wheel travel) would be
+                              //      theoretically ideal 90 degree right turn, but reduced to 250 due to extra wheel momentum
+    
+    case 2:                   // 2  - black square (finish box for maze solving)
+      pause();
+      break;
+    
+    case 3:                   // 3  - dead end T intersection (bot can turn left or right)
+      turnLeft(turnSpeed);         //      100 motor speed (130 seemed to be too fast for IR sensors to catch the line)
+      break;                  //      270 degrees of rotation (6 inches of wheel travel) would be
+                              //      theoretically ideal, but reduced here due to extra wheel momentum
+    
+    case 4:                   // 4  - right hand T intersection (bot can turn right or continue straight)
+      followLine();
+      break;
+    
+    case 5:                   // 5  - left hand T intersection (bot can turn left or continue straight)
+      turnLeft(turnSpeed);
       break;
     
     case 6:                   // 6  - dead end line (bot must stop or complete a U-turn)
@@ -497,8 +551,8 @@ int checkForNode(){
     //Serial.println("Sharp right or 3 way right?");
     //Serial3.println("Sharp right or 3 way right?");
     // proceed about an inch
-    Motor1.move(BACKWARD, 140, 35, BRAKE);
-    Motor2.move(BACKWARD, 140, 35, BRAKE);
+    Motor1.move(BACKWARD, nodeCheckSpeed, 35, BRAKE);
+    Motor2.move(BACKWARD, nodeCheckSpeed, 35, BRAKE);
     delay(350);  // give previous movement a chance to finish
     //Serial.println(" - check again for sharp right or 3 way right");
     //Serial3.println(" - check again for sharp right or 3 way right");
@@ -510,7 +564,7 @@ int checkForNode(){
       //Serial.println(" - Yep, it's a sharp right. Rotate right and find line");
       //Serial3.println(" - Yep, it's a sharp right. Rotate right and find line");
       while ( position < 1000 ){    // no need to rotate all the way back to 3500, just get to 1000 and resume PD
-        Motor1.move(BACKWARD, 140);
+        Motor1.move(BACKWARD, turnSpeed);
         //Motor2.move(FORWARD, 130); // comment out to just pivot, need to coordinate with "proceed 2 inches" distance above
         position = qtra.readLine(sensorValues);
       }      
@@ -536,8 +590,8 @@ int checkForNode(){
     //Serial.println("Sharp left or 3 way left?");
     //Serial3.println("Sharp left or 3 way left?");
     // proceed 90 degrees (2")
-    Motor1.move(BACKWARD, 140, 35, BRAKE);
-    Motor2.move(BACKWARD, 140, 35, BRAKE);
+    Motor1.move(BACKWARD, nodeCheckSpeed, 35, BRAKE);
+    Motor2.move(BACKWARD, nodeCheckSpeed, 35, BRAKE);
     delay(350);  // debugging, remove later (might need to give previous movement a chance to finish?)
     //Serial.println(" - check again for sharp left or 3 way left");
     //Serial3.println(" - check again for sharp left or 3 way left");
@@ -550,7 +604,7 @@ int checkForNode(){
       //Serial3.println(" - Yep, it's a sharp left. Rotate left and find line");
       while ( position > 5000 ){    // no need to rotate all the way back to 3500, just get to 5000 and resume PD
         //Motor1.move(FORWARD, 130); // comment out to just pivot, need to coordinate with "proceed 2 inches" distance above
-        Motor2.move(BACKWARD, 140);
+        Motor2.move(BACKWARD, turnSpeed);
         position = qtra.readLine(sensorValues);
       }
       allStop();    // maybe keep allstop to reduce overshoot
@@ -572,7 +626,7 @@ int checkForNode(){
   // I was reading a line and now *BAM* no line whatsoever. Must be a dead end.
   if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
     allStop();
-    uTurn(100);  // TODO variablize turn speeds, 130 seemed to be too fast for IR sensors to catch the line
+    uTurn(uTurnSpeed);  // TODO variablize turn speeds, 130 seemed to be too fast for IR sensors to catch the line
     return 6;
   }
 
@@ -619,7 +673,7 @@ int turnRight(int speed){
 
 
 ////////////////////////////////////////////////////////////////////////
-int turnLeft(int speed, int degrees){               // robot turns left by pivoting on the left wheel (only running right wheel)
+int turnLeft(int speed){               // robot turns left by pivoting on the left wheel (only running right wheel)
 
   //Serial3.println("Entering turnLeft function");
   // robot turns left by pivoting on the left wheel (only running right wheel)
@@ -663,7 +717,7 @@ int uTurn(int speed){                         // robot rotates by pivoting in pl
     Motor1.move(BACKWARD, speed);
     Motor2.move(FORWARD, speed);
     qtra.readLine(sensorValues);
-    delay(100);  // give a chance for sensors to finish reading?
+    delay(75);  // give a chance for sensors to finish reading?
   }
 
   /*
