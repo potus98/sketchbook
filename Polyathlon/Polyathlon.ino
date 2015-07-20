@@ -95,9 +95,9 @@ int speedMotorB = 0;
 int nodeType = 0;
 int IRwhite = 200;             // any IR value smaller than this is treated as white
 int IRblack = 600;             // any IR value larger than this is treated as black
-int turnSpeed = 115;           // running too fast sometimes results in missed IR scans as array sweeps too fast over a line
-int uTurnSpeed = 105;          // ...or overshoots a target position
-int nodeCheckSpeed = 120;      // ...or advances farther than necessary for a second reading
+int turnSpeed = 100;           // running too fast sometimes results in missed IR scans as array sweeps too fast over a line
+int pivotSpeed = 100;          // ...or overshoots a target position
+int nodeCheckSpeed = 100;      // ...or advances farther than necessary for a second reading
 char facing = 'N';             // direction bot is facing. N, S, E, W (North, South, East, West)
 int leftDistanceCumulative = 0;
 int rightDistanceCumulative = 0;
@@ -107,6 +107,8 @@ int leftDistanceTraveled = 0;
 int rightDistanceTraveled = 0;
 int avgDistanceTraveled = 0;
 int reconMode = 0;             // maze recon mode 0 = on, 1 = off
+int nodeBump = 120;             // extra nudge forward after detecting a node to improve node-to-node measurements
+int uTurnBump = 0;
 
 ////////////////////////////////////////////////////////////////////////
 // Setup
@@ -330,7 +332,7 @@ int getDistance(){      // determine distance from last time this fucntion was c
     avgDistanceTraveled = 0;
   }
 
-  
+  /*
   Serial3.print("Total: ");
   Serial3.print(leftDistanceCumulative);
   Serial3.print(" ");
@@ -343,14 +345,16 @@ int getDistance(){      // determine distance from last time this fucntion was c
   Serial3.print(leftDistanceTraveled);
   Serial3.print(" ");
   Serial3.println(rightDistanceTraveled);
-  Serial3.print("avg: ");
+  */
+  
+  Serial3.print("Distance: ");
   Serial3.println(avgDistanceTraveled);
   Serial3.println(" ");
-  delay(5000);
-  
-  
+    
   leftDistancePrevious = leftDistanceCumulative;           // reset starting point for next leg
   rightDistancePrevious = rightDistanceCumulative;         // reset starting point for next leg
+  
+  delay(1000); // TODO remove debugging delay
   
   return avgDistanceTraveled;
   
@@ -434,7 +438,8 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
 
     case 1:                   // 1  - four way intersection (bot can turn left, right, or continue straight)
       getDistance();          //      obtain distance reading from previous node
-      turnRight(turnSpeed);
+      //turnRight(turnSpeed);
+      pivotRight(pivotSpeed);
       getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
@@ -444,14 +449,16 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
     
     case 3:                   // 3  - dead end T intersection (bot can turn left or right)
       getDistance();          //      obtain distance reading from previous node
-      turnRight(turnSpeed);
+      //turnRight(turnSpeed);
+      pivotRight(pivotSpeed);
       getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
 
     
     case 4:                   // 4  - right hand T intersection (bot can turn right or continue straight)
       getDistance();          //      obtain distance reading from previous node
-      turnRight(turnSpeed);
+      //turnRight(turnSpeed);
+      pivotRight(pivotSpeed);
       getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
@@ -462,19 +469,21 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
     
     case 6:                   // 6  - dead end line (bot must stop or complete a U-turn)
       getDistance();          //      obtain distance reading from previous node
-      uTurn(uTurnSpeed);
+      pivotRight(pivotSpeed);
       getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
       
     case 9:                   // 9  - 90 degree right turn (bot can only turn right) need to identify such nodes for building a coordinate grid of a maze
       getDistance();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
-      turnRight(turnSpeed);
+      //turnRight(turnSpeed);
+      pivotRight(pivotSpeed);
       getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
     case 10:                  // 10 - 90 degree left turn (bot can only turn left) need to identify such nodes for building a coordinate grid of a maze
       getDistance();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
-      turnLeft(turnSpeed);
+      //turnLeft(turnSpeed);
+      pivotLeft(pivotSpeed);
       getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
@@ -486,7 +495,7 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
   
   followLine();
   
-} // close mazeSolverModeRHS
+} // close mazeSolverModeRHSPruning
 
 ////////////////////////////////////////////////////////////////////////
 int mazeSolverModeLHS(){      // bot acts like a maze solver using Left Hand Side algorithm
@@ -608,11 +617,13 @@ int checkForNode(){
   // take an IR reading
   //Serial.println("taking an IR reading");
   //qtra.readLine(sensorValues);
-
-
   //Serial.println("Entering checkForNode function");
   //Serial3.println("Entering checkForNode function");
+  
+  
   int position = qtra.readLine(sensorValues); // initalize position in this scope
+  delay(10);  // allow time to collect readings TODO variablize?
+
 
   // print the IR values
   //printIRarray();
@@ -628,9 +639,9 @@ int checkForNode(){
     //
 
     // TODO actually, don't think this extra bump is necessary, not sure, keep the nudge for now
-    Motor1.move(BACKWARD, nodeCheckSpeed, 25, BRAKE);
-    Motor2.move(BACKWARD, nodeCheckSpeed, 25, BRAKE);
-    delay(350);  // give previous movement a chance to finish
+    //Motor1.move(BACKWARD, nodeCheckSpeed, 25, BRAKE);
+    //Motor2.move(BACKWARD, nodeCheckSpeed, 25, BRAKE);
+    //delay(350);  // give previous movement a chance to finish
     
     // This implementation is basic since it requires careful control of distance moved between each IR reading
     // TODO find a method that can track IR readings across time (actually, across distances via wheel encoders)
@@ -640,9 +651,7 @@ int checkForNode(){
     //Serial3.println("Intersection?");
     
     allStop();
-    delay(250);
-    
-    //delay(500);
+    //delay(250);
     
     // if in recon mode, stop and take a good distance measurement before any more wheel movement
     //if (reconMode == 0){
@@ -654,9 +663,12 @@ int checkForNode(){
     // ...by the time the bot stops above, it has already advanced 1 to 1.5 inches beyond the original line that tripped these checks.
     //Motor1.move(BACKWARD, 100, 35, BRAKE);
     //Motor2.move(BACKWARD, 100, 35, BRAKE);
-    //while (Motor1.isTurning() || Motor2.isTurning()); // Wait until it has reached the position
+
     
-    qtra.readLine(sensorValues);  // obtain reading after just passing over a line
+    //while (Motor1.isTurning() || Motor2.isTurning()); // Wait until it has reached the position
+    delay(1000);  // give bot a moment to come to a stop before taking a second reading
+    qtra.readLine(sensorValues);                      // obtain reading after just passing over a line
+    delay(20);   //give sensors a moment to read
     
     //Serial.println(" - check for 4-way intersection");
     //Serial3.println(" - check for 4-way intersection");
@@ -664,12 +676,15 @@ int checkForNode(){
       // outer sensors see white and at least one of the middle sensors sees black
         //Serial.println(" - Yep, it's a 4-way intersection");
         //Serial3.println(" - Yep, it's a 4-way intersection");
-        
+
+        /*
         // TODO actually, not sure, keep the nudge for now for better node-to-node measurements
-        Motor1.move(BACKWARD, nodeCheckSpeed, 35, BRAKE);                                              // TODO variablize nudge distance (degrees of rotation)
-        Motor2.move(BACKWARD, nodeCheckSpeed, 35, BRAKE);
-        delay(350);  // give previous movement a chance to finish
-      
+        Motor1.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);                                              // TODO variablize nudge distance (degrees of rotation)
+        Motor2.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);
+        delay(500);  // give previous movement a chance to finish
+        */
+
+        Serial3.println("return 1");
         return 1;  
     }
     //Serial.println(" - Well, it's not a 4-way intersection, check for finish square");
@@ -691,11 +706,13 @@ int checkForNode(){
     {
       //Serial.println(" - Yep, it's a dead end T intersection");
       //Serial3.println(" - Yep, it's a dead end T intersection");
-      
+
+      /*
       // TODO actually, not sure, keep the nudge for now for better node-to-node measurements
-      Motor1.move(BACKWARD, nodeCheckSpeed, 35, BRAKE);
-      Motor2.move(BACKWARD, nodeCheckSpeed, 35, BRAKE);
-      delay(350);  // give previous movement a chance to finish
+      Motor1.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);
+      Motor2.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);
+      delay(500);  // give previous movement a chance to finish
+      */
       
       return 3;
     }
@@ -710,16 +727,17 @@ int checkForNode(){
     //Serial.println("Sharp right or 3 way right?");
     //Serial3.println("Sharp right or 3 way right?");
     // proceed about an inch
-    
+
+    /*
     // TODO actually not sure, keep the nudge for now
-    Motor1.move(BACKWARD, nodeCheckSpeed, 35, BRAKE);
-    Motor2.move(BACKWARD, nodeCheckSpeed, 35, BRAKE);
-    delay(250);  // give previous movement a chance to finish
-    
+    Motor1.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);
+    Motor2.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);
+    delay(500);  // give previous movement a chance to finish
+    */
     
     //Serial.println(" - check again for sharp right or 3 way right");
     //Serial3.println(" - check again for sharp right or 3 way right");
-    position = qtra.readLine(sensorValues);
+    position = qtra.readLine(sensorValues); // take a second reading, but don't overwrite the orignal checkForNode reading
 
     
     // check for all white
@@ -744,6 +762,7 @@ int checkForNode(){
       //delay(2000);  // debugging, remove later
       */
       
+      Serial3.println("return 9");
       return 9;
     }
     
@@ -753,11 +772,13 @@ int checkForNode(){
         //Serial.println(" - Right-handed 3-way intersection");
         //Serial3.println(" - Right-handed 3-way intersection");
 
+        /*
         // TODO actually not sure, keep the nudge for now
-        Motor1.move(BACKWARD, nodeCheckSpeed, 35, BRAKE);
-        Motor2.move(BACKWARD, nodeCheckSpeed, 35, BRAKE);
-        delay(250);  // give previous movement a chance to finish
-    
+        Motor1.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);
+        Motor2.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);
+        delay(500);  // give previous movement a chance to finish
+        */
+        
         Serial3.println("return 4");
         return 4;
     }
@@ -771,11 +792,13 @@ int checkForNode(){
     //Serial.println("Sharp left or 3 way left?");
     //Serial3.println("Sharp left or 3 way left?");
     // proceed 90 degrees (2")
-    
+
+    /*
     // TODO actually not sure, keep the nudge for now
-    Motor1.move(BACKWARD, nodeCheckSpeed, 35, BRAKE);
-    Motor2.move(BACKWARD, nodeCheckSpeed, 35, BRAKE);
-    delay(350);  // give previous movement a chance to finish
+    Motor1.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);
+    Motor2.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);
+    delay(500);  // give previous movement a chance to finish
+    */
     
     //Serial.println(" - check again for sharp left or 3 way left");
     //Serial3.println(" - check again for sharp left or 3 way left");
@@ -814,11 +837,6 @@ int checkForNode(){
   // check for node 6 (dead end)
   // I was reading a line and now *BAM* no line whatsoever. Must be a dead end.
   if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
-
-    // move straight forward a bit to provide more room to resume line following after completing the U-Turn manuever
-    Motor1.move(BACKWARD, nodeCheckSpeed, 130, BRAKE);
-    Motor2.move(BACKWARD, nodeCheckSpeed, 130, BRAKE);
-    delay(100); // allow previous maneuver to complete
     
     //allStop();
 
@@ -869,6 +887,7 @@ int turnRight(int speed){
 } // close turnRight function
 
 
+
 ////////////////////////////////////////////////////////////////////////
 int turnLeft(int speed){               // robot turns left by pivoting on the left wheel (only running right wheel)
   //Serial3.println("Entering turnLeft function");
@@ -901,26 +920,60 @@ int turnLeft(int speed){               // robot turns left by pivoting on the le
   
 } // close turnLeft function
 
-int uTurn(int speed){                         // robot rotates by pivoting in place (turning both wheels in opposite directions)
-  // start rotating until line position reached
+int pivotRight(int speed){                         // robot rotates by pivoting in place (turning both wheels in opposite directions)
+
+  Serial3.println("pivot right");
+  // move straight forward a bit to provide more room to resume line following after completing the U-Turn manuever
+  uTurnBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???)
+  Motor1.move(BACKWARD, nodeCheckSpeed, uTurnBump, BRAKE);  // TODO move nodeBump to separate function since maze solver will use, but line follower may not
+  Motor2.move(BACKWARD, nodeCheckSpeed, uTurnBump, BRAKE);
+  delay(500); // allow previous maneuver to complete
+
+  // bot might be on a current line so get off the current line
+  while (sensorValues[4] > IRblack || sensorValues[5] > IRblack || sensorValues[6] > IRblack || sensorValues[7] > IRblack){
+    Motor1.move(BACKWARD, speed);
+    Motor2.move(FORWARD, speed);
+    qtra.readLine(sensorValues);
+    delay(20);  // give a chance for sensors to finish reading?
+  }
+  
+  // continue rotating until line reached
   //while (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
   while (sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite){
     Motor1.move(BACKWARD, speed);
     Motor2.move(FORWARD, speed);
     qtra.readLine(sensorValues);
-    delay(100);  // give a chance for sensors to finish reading?
+    delay(20);  // give a chance for sensors to finish reading?
   }
+} // close pivotRight function
 
-  /*
-  //Serial.println("Entering uTurn function");
-  //Serial3.println("Entering uTurn function");
-  Motor1.move(BACKWARD, speed, 200, BRAKE);
-  Motor2.move(FORWARD, speed, 200, BRAKE);
-  delay(2000);
-  allStop();
-  */
+int pivotLeft(int speed){                         // robot rotates by pivoting in place (turning both wheels in opposite directions)
 
-} // close uTurn function
+  Serial3.println("pivot left");
+  // move straight forward a bit to improve node-to-node measurments...
+  // and provide more room to resume line following after completing the U-Turn manuever
+  uTurnBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???)
+  Motor1.move(BACKWARD, nodeCheckSpeed, uTurnBump, BRAKE);  // TODO move nodeBump to separate function since maze solver will use, but line follower may not
+  Motor2.move(BACKWARD, nodeCheckSpeed, uTurnBump, BRAKE);
+  delay(500); // allow previous maneuver to complete
+
+  // bot might be on a current line so get off the current line
+  while (sensorValues[0] > IRblack || sensorValues[1] > IRblack || sensorValues[2] > IRblack || sensorValues[3] > IRblack){
+    Motor1.move(FORWARD, speed);
+    Motor2.move(BACKWARD, speed);
+    qtra.readLine(sensorValues);
+    delay(20);  // give a chance for sensors to finish reading?
+  }
+  
+  // continue rotating until line reached
+  //while (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
+  while (sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite){
+    Motor1.move(FORWARD, speed);
+    Motor2.move(BACKWARD, speed);
+    qtra.readLine(sensorValues);
+    delay(20);  // give a chance for sensors to finish reading?
+  }
+} // close pivotLeft function
 
 ////////////////////////////////////////////////////////////////////////
 int checkForSwitchback(){
