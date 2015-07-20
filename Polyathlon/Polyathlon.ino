@@ -68,6 +68,7 @@ int buttonStateB = 0;          // variable for reading the second pushbutton sta
 QTRSensorsAnalog qtra((unsigned char[]) {8, 9, 10, 11, 12, 13, 14, 15},
 NUM_SENSORS, NUM_SAMPLES_PER_SENSOR, EMITTER_PIN);
 unsigned int sensorValues[NUM_SENSORS];
+unsigned int sensorValuesB[NUM_SENSORS];  // second array use for doublecheck node readings
 
 ////////////////////////////////////////////////////////////////////////
 // Prepare PD - alternative to using PID library
@@ -667,12 +668,12 @@ int checkForNode(){
     
     //while (Motor1.isTurning() || Motor2.isTurning()); // Wait until it has reached the position
     delay(1000);  // give bot a moment to come to a stop before taking a second reading
-    qtra.readLine(sensorValues);                      // obtain reading after just passing over a line
+    qtra.readLine(sensorValuesB);                      // obtain reading after just passing over a line
     delay(20);   //give sensors a moment to read
     
     //Serial.println(" - check for 4-way intersection");
     //Serial3.println(" - check for 4-way intersection");
-    if ((sensorValues[0] < IRwhite && sensorValues[7] < IRwhite) && (sensorValues[3] > IRblack || sensorValues[4] > IRblack)){
+    if ((sensorValuesB[0] < IRwhite && sensorValuesB[7] < IRwhite) && (sensorValuesB[3] > IRblack || sensorValuesB[4] > IRblack)){
       // outer sensors see white and at least one of the middle sensors sees black
         //Serial.println(" - Yep, it's a 4-way intersection");
         //Serial3.println(" - Yep, it's a 4-way intersection");
@@ -684,25 +685,26 @@ int checkForNode(){
         delay(500);  // give previous movement a chance to finish
         */
 
-        Serial3.println("return 1");
+        Serial3.println("ret 1");
         return 1;  
     }
     //Serial.println(" - Well, it's not a 4-way intersection, check for finish square");
     //Serial3.println(" - Well, it's not a 4-way intersection, check for finish square");
     //if (sensorValues[1] > IRblack && sensorValues[2] > IRblack && sensorValues[3] > IRblack && sensorValues[4] > IRblack && sensorValues[5] > IRblack && sensorValues[6] > IRblack)
-    if (sensorValues[2] > IRblack && sensorValues[3] > IRblack && sensorValues[4] > IRblack && sensorValues[5] > IRblack) // reduced to middle four sensors
+    if (sensorValuesB[2] > IRblack && sensorValuesB[3] > IRblack && sensorValuesB[4] > IRblack && sensorValuesB[5] > IRblack) // reduced to middle four sensors
     {
       //Serial.println(" - Yep, it's a finish square");
       //Serial3.println(" - Yep, it's a finish square");
       //pause();  // TODO just return 2 and let the maze function do the pause()
       
       reconMode = 1;
+      Serial3.println("ret 2");
       return 2;
     }
 
     //Serial.println(" - check for dead end T intersection");
     //Serial3.println(" - check for dead end T intersection");
-    if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite)
+    if (sensorValuesB[0] < IRwhite && sensorValuesB[1] < IRwhite && sensorValuesB[2] < IRwhite && sensorValuesB[3] < IRwhite && sensorValuesB[4] < IRwhite && sensorValuesB[5] < IRwhite && sensorValuesB[6] < IRwhite && sensorValuesB[7] < IRwhite)
     {
       //Serial.println(" - Yep, it's a dead end T intersection");
       //Serial3.println(" - Yep, it's a dead end T intersection");
@@ -713,7 +715,7 @@ int checkForNode(){
       Motor2.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);
       delay(500);  // give previous movement a chance to finish
       */
-      
+      Serial3.println("ret 3");
       return 3;
     }
 
@@ -723,6 +725,9 @@ int checkForNode(){
   // check for node 9 and 4 (9 is 90 degree right turn, 4 is right hand T)
   //if ((sensorValues[0] > IRblack && sensorValues[1] > IRblack) && (sensorValues[6] < IRwhite && sensorValues[7] < IRwhite)) {
   if ((sensorValues[0] > IRblack && sensorValues[1] > IRblack && sensorValues[2] > IRblack) && (sensorValues[6] < IRwhite && sensorValues[7] < IRwhite)) {
+
+    allStop();
+    
     // sharp right, or 3 way right?
     //Serial.println("Sharp right or 3 way right?");
     //Serial3.println("Sharp right or 3 way right?");
@@ -737,11 +742,13 @@ int checkForNode(){
     
     //Serial.println(" - check again for sharp right or 3 way right");
     //Serial3.println(" - check again for sharp right or 3 way right");
-    position = qtra.readLine(sensorValues); // take a second reading, but don't overwrite the orignal checkForNode reading
+    //position = qtra.readLine(sensorValuesB); // take a second reading, but don't overwrite the orignal checkForNode reading
+    qtra.readLine(sensorValuesB); // take a second reading, but don't overwrite the orignal checkForNode reading
+    delay(20);
 
     
     // check for all white
-    if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
+    if (sensorValuesB[0] < IRwhite && sensorValuesB[1] < IRwhite && sensorValuesB[2] < IRwhite && sensorValuesB[3] < IRwhite && sensorValuesB[4] < IRwhite && sensorValuesB[5] < IRwhite && sensorValuesB[6] < IRwhite && sensorValuesB[7] < IRwhite){
       // if all white here, rotate right until seeing line again and return 9
       //Serial.println(" - Yep, it's a sharp right. Rotate right and find line");
       //Serial3.println(" - Yep, it's a sharp right. Rotate right and find line");
@@ -762,12 +769,12 @@ int checkForNode(){
       //delay(2000);  // debugging, remove later
       */
       
-      Serial3.println("return 9");
+      Serial3.println("ret 9");
       return 9;
     }
     
     // check for 3 way intersection (bot can turn right, or continue straight)
-    if ((sensorValues[0] < IRwhite && sensorValues[7] < IRwhite) && (sensorValues[3] > IRblack || sensorValues[4] > IRblack)){
+    if ((sensorValuesB[0] < IRwhite && sensorValuesB[7] < IRwhite) && (sensorValuesB[3] > IRblack || sensorValuesB[4] > IRblack)){
       // outer sensors see white and at least one of the middle sensors sees black
         //Serial.println(" - Right-handed 3-way intersection");
         //Serial3.println(" - Right-handed 3-way intersection");
@@ -779,7 +786,7 @@ int checkForNode(){
         delay(500);  // give previous movement a chance to finish
         */
         
-        Serial3.println("return 4");
+        Serial3.println("ret 4");
         return 4;
     }
   }  // close check for node 9 and 4
@@ -788,6 +795,8 @@ int checkForNode(){
   // check for node 10 and 5
   //if ((sensorValues[0] < IRwhite && sensorValues[1] < IRwhite) && (sensorValues[6] > IRblack && sensorValues[7] > IRblack)) {
   if ((sensorValues[0] < IRwhite && sensorValues[1] < IRwhite) && (sensorValues[5] > IRblack && sensorValues[6] > IRblack && sensorValues[7] > IRblack)) {
+
+    allStop();
     
     //Serial.println("Sharp left or 3 way left?");
     //Serial3.println("Sharp left or 3 way left?");
@@ -803,10 +812,12 @@ int checkForNode(){
     //Serial.println(" - check again for sharp left or 3 way left");
     //Serial3.println(" - check again for sharp left or 3 way left");
       
-    position = qtra.readLine(sensorValues);
+    //position = qtra.readLine(sensorValues);
+    qtra.readLine(sensorValuesB);
+    delay(20);
     
     // check for all white
-    if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
+    if (sensorValuesB[0] < IRwhite && sensorValuesB[1] < IRwhite && sensorValuesB[2] < IRwhite && sensorValuesB[3] < IRwhite && sensorValuesB[4] < IRwhite && sensorValuesB[5] < IRwhite && sensorValuesB[6] < IRwhite && sensorValuesB[7] < IRwhite){
       // if all white here, rotate left until seeing line again and return 10
       //Serial.println(" - Yep, it's a sharp left. Rotate left and find line");
       //Serial3.println(" - Yep, it's a sharp left. Rotate left and find line");
@@ -821,14 +832,16 @@ int checkForNode(){
       */
       
       //delay(2000);  // debugging, remove later
+      Serial3.println("ret 10");
       return 10;
     }
     
     // check for 3 way intersection (bot can turn left, or continue straight)
-    if ((sensorValues[0] < IRwhite && sensorValues[7] < IRwhite) && (sensorValues[3] > IRblack || sensorValues[4] > IRblack)){
+    if ((sensorValuesB[0] < IRwhite && sensorValuesB[7] < IRwhite) && (sensorValuesB[3] > IRblack || sensorValuesB[4] > IRblack)){
       // outer sensors see white and at least one of the middle sensors sees black
         //Serial.println(" - Left-handed 3-way intersection");
         //Serial3.println(" - Left-handed 3-way intersection");
+        Serial3.println("ret 5");
         return 5;
     }
   }  // close check for node 10 and 5
@@ -838,18 +851,19 @@ int checkForNode(){
   // I was reading a line and now *BAM* no line whatsoever. Must be a dead end.
   if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
     
-    //allStop();
+    allStop();
 
     /*
     uTurn(uTurnSpeed);  // TODO variablize turn speeds, 130 seemed to be too fast for IR sensors to catch the line
     */
-    
+    Serial3.println("ret 6");
     return 6;
   }
 
-  // no nodes detected
+  // no known nodes detected
   //Serial.println(" No nodes detected, returning 0 (zero)");
   //Serial3.println(" No nodes detected, returning 0 (zero)");
+  //Serial3.println("ret 0");
   return 0;
 } // close checkForNode() function
 
