@@ -75,10 +75,10 @@ unsigned int sensorValuesB[NUM_SENSORS];  // second array use for doublecheck no
 // http://letsmakerobots.com/node/38550
 #define Kp .2 // experiment to determine this, start by something small that just makes your bot follow the line at a slow speed
 #define Kd .8 // experiment to determine this, slowly increase the speeds and adjust this value. ( Note: Kp < Kd) 
-#define rightMaxSpeed 200 // max speed of the robot
-#define leftMaxSpeed 200 // max speed of the robot
-#define rightBaseSpeed 170 // this is the speed at which the motors should spin when the robot is perfectly on the line
-#define leftBaseSpeed 170  // this is the speed at which the motors should spin when the robot is perfectly on the line
+#define rightMaxSpeed 180 // max speed of the robot
+#define leftMaxSpeed 180 // max speed of the robot
+#define rightBaseSpeed 160 // this is the speed at which the motors should spin when the robot is perfectly on the line
+#define leftBaseSpeed 160  // this is the speed at which the motors should spin when the robot is perfectly on the line
 int lastError = 0;
 
 ////////////////////////////////////////////////////////////////////////
@@ -622,14 +622,14 @@ int checkForNode(){
   if (sensorValues[1] > IRblack && sensorValues[2] > IRblack && sensorValues[3] > IRblack && sensorValues[4] > IRblack && sensorValues[5] > IRblack && sensorValues[6] > IRblack)
   {
     allStop();
-    delay(1000);  // give bot a moment to come to a stop before taking a second reading
+    delay(400);  // give bot a moment to come to a stop before taking a second reading
     
     //if (reconMode == 0){
     //  getDistance();
     //}
     
     qtra.readLine(sensorValuesB);                      // obtain reading after just passing over a line
-    delay(20);   //give sensors a moment to read
+    delay(10);   //give sensors a moment to read
     
     if ((sensorValuesB[0] < IRwhite && sensorValuesB[7] < IRwhite) && (sensorValuesB[3] > IRblack || sensorValuesB[4] > IRblack)){
       // outer sensors see white and at least one of the middle sensors sees black
@@ -655,9 +655,9 @@ int checkForNode(){
   // check for node 9 and 4 (9 is 90 degree right turn, 4 is right hand T)
   if ((sensorValues[0] > IRblack && sensorValues[1] > IRblack && sensorValues[2] > IRblack) && (sensorValues[6] < IRwhite && sensorValues[7] < IRwhite)) {
     allStop();
-    delay(1000);  // give bot a moment to come to a stop before taking a second reading
+    delay(400);  // give bot a moment to come to a stop before taking a second reading
     qtra.readLine(sensorValuesB); // take a second reading, but don't overwrite the orignal checkForNode reading
-    delay(20);
+    delay(10);
 
     // check for all white
     if (sensorValuesB[0] < IRwhite && sensorValuesB[1] < IRwhite && sensorValuesB[2] < IRwhite && sensorValuesB[3] < IRwhite && sensorValuesB[4] < IRwhite && sensorValuesB[5] < IRwhite && sensorValuesB[6] < IRwhite && sensorValuesB[7] < IRwhite){      
@@ -677,9 +677,9 @@ int checkForNode(){
   // check for node 10 and 5 (10 is a 90 degree left turn, 5 is right left hand T)
   if ((sensorValues[0] < IRwhite && sensorValues[1] < IRwhite) && (sensorValues[5] > IRblack && sensorValues[6] > IRblack && sensorValues[7] > IRblack)) {
     allStop();
-    delay(1000);  // give bot a moment to come to a stop before taking a second reading
+    delay(400);  // give bot a moment to come to a stop before taking a second reading
     qtra.readLine(sensorValuesB);
-    delay(20);
+    delay(10);
     
     // check for all white
     if (sensorValuesB[0] < IRwhite && sensorValuesB[1] < IRwhite && sensorValuesB[2] < IRwhite && sensorValuesB[3] < IRwhite && sensorValuesB[4] < IRwhite && sensorValuesB[5] < IRwhite && sensorValuesB[6] < IRwhite && sensorValuesB[7] < IRwhite){
@@ -700,7 +700,7 @@ int checkForNode(){
   // I was reading a line and now *BAM* no line whatsoever. Must be a dead end.
   if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){    
     allStop();
-    delay(1000);  // give bot a moment to come to a stop before taking a second reading
+    delay(400);  // give bot a moment to come to a stop before taking a second reading
     Serial3.println("ret 6");
     return 6;
   }
@@ -719,14 +719,14 @@ int turnRight(int speed){
   while (sensorValues[4] > IRblack || sensorValues[5] > IRblack || sensorValues[6] > IRblack || sensorValues[7] > IRblack){
     Motor1.move(BACKWARD, speed);
     qtra.readLine(sensorValues);
-    delay(100);  // give a chance for sensors to finish reading?
+    delay(10);  // give a chance for sensors to finish reading?
   }
   
   // ...then keep turning right while all sensors see white until a line is detected
   while (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
     Motor1.move(BACKWARD, speed);
     qtra.readLine(sensorValues);
-    delay(100);  // give a chance for sensors to finish reading?
+    delay(10);  // give a chance for sensors to finish reading?
   }
   
   /* original turnRight code that rotated the outside wheel a certain number of degrees, then stopped.  
@@ -753,14 +753,14 @@ int turnLeft(int speed){               // robot turns left by pivoting on the le
   while (sensorValues[0] > IRblack || sensorValues[1] > IRblack || sensorValues[2] > IRblack || sensorValues[3] > IRblack){
     Motor2.move(BACKWARD, speed);
     qtra.readLine(sensorValues);
-    delay(100);  // give a chance for sensors to finish reading
+    delay(10);  // give a chance for sensors to finish reading
   }
   
   // ...then keep turning left while all sensors see white until a line is detected
   while (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
     Motor2.move(BACKWARD, speed);
     qtra.readLine(sensorValues);
-    delay(100);  // give a chance for sensors to finish reading
+    delay(10);  // give a chance for sensors to finish reading
   }
 
   /*
@@ -783,14 +783,14 @@ int pivotRight(int speed){                         // robot rotates by pivoting 
   uTurnBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???)
   Motor1.move(BACKWARD, nodeCheckSpeed, uTurnBump, BRAKE);  // TODO move nodeBump to separate function since maze solver will use, but line follower may not
   Motor2.move(BACKWARD, nodeCheckSpeed, uTurnBump, BRAKE);
-  delay(500); // allow previous maneuver to complete
+  delay(400); // allow previous maneuver to complete
 
   // bot might be on a current line so get off the current line
-  while (sensorValues[4] > IRblack || sensorValues[5] > IRblack || sensorValues[6] > IRblack || sensorValues[7] > IRblack){
+  while (sensorValues[2] > IRblack || sensorValues[3] > IRblack || sensorValues[4] > IRblack || sensorValues[5] > IRblack || sensorValues[6] > IRblack || sensorValues[7] > IRblack){
     Motor1.move(BACKWARD, speed);
     Motor2.move(FORWARD, speed);
     qtra.readLine(sensorValues);
-    delay(20);  // give a chance for sensors to finish reading?
+    delay(10);  // give a chance for sensors to finish reading?
   }
   
   // continue rotating until line reached
@@ -799,7 +799,7 @@ int pivotRight(int speed){                         // robot rotates by pivoting 
     Motor1.move(BACKWARD, speed);
     Motor2.move(FORWARD, speed);
     qtra.readLine(sensorValues);
-    delay(20);  // give a chance for sensors to finish reading?
+    delay(10);  // give a chance for sensors to finish reading?
   }
 } // close pivotRight function
 
@@ -811,14 +811,14 @@ int pivotLeft(int speed){                         // robot rotates by pivoting i
   uTurnBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???)
   Motor1.move(BACKWARD, nodeCheckSpeed, uTurnBump, BRAKE);  // TODO move nodeBump to separate function since maze solver will use, but line follower may not
   Motor2.move(BACKWARD, nodeCheckSpeed, uTurnBump, BRAKE);
-  delay(500); // allow previous maneuver to complete
+  delay(400); // allow previous maneuver to complete
 
   // bot might be on a current line so get off the current line
-  while (sensorValues[0] > IRblack || sensorValues[1] > IRblack || sensorValues[2] > IRblack || sensorValues[3] > IRblack){
+  while (sensorValues[0] > IRblack || sensorValues[1] > IRblack || sensorValues[2] > IRblack || sensorValues[3] > IRblack || sensorValues[4] > IRblack || sensorValues[5] > IRblack){
     Motor1.move(FORWARD, speed);
     Motor2.move(BACKWARD, speed);
     qtra.readLine(sensorValues);
-    delay(20);  // give a chance for sensors to finish reading?
+    delay(10);  // give a chance for sensors to finish reading?
   }
   
   // continue rotating until line reached
@@ -827,7 +827,7 @@ int pivotLeft(int speed){                         // robot rotates by pivoting i
     Motor1.move(FORWARD, speed);
     Motor2.move(BACKWARD, speed);
     qtra.readLine(sensorValues);
-    delay(20);  // give a chance for sensors to finish reading?
+    delay(10);  // give a chance for sensors to finish reading?
   }
 } // close pivotLeft function
 
