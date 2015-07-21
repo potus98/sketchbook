@@ -75,10 +75,10 @@ unsigned int sensorValuesB[NUM_SENSORS];  // second array use for doublecheck no
 // http://letsmakerobots.com/node/38550
 #define Kp .2 // experiment to determine this, start by something small that just makes your bot follow the line at a slow speed
 #define Kd .8 // experiment to determine this, slowly increase the speeds and adjust this value. ( Note: Kp < Kd) 
-#define rightMaxSpeed 180 // max speed of the robot
-#define leftMaxSpeed 180 // max speed of the robot
-#define rightBaseSpeed 160 // this is the speed at which the motors should spin when the robot is perfectly on the line
-#define leftBaseSpeed 160  // this is the speed at which the motors should spin when the robot is perfectly on the line
+#define rightMaxSpeed 190 // max speed of the robot
+#define leftMaxSpeed 190 // max speed of the robot
+#define rightBaseSpeed 170 // this is the speed at which the motors should spin when the robot is perfectly on the line
+#define leftBaseSpeed 170  // this is the speed at which the motors should spin when the robot is perfectly on the line
 int lastError = 0;
 
 ////////////////////////////////////////////////////////////////////////
@@ -96,10 +96,18 @@ int speedMotorB = 0;
 int nodeType = 0;
 int IRwhite = 200;             // any IR value smaller than this is treated as white
 int IRblack = 600;             // any IR value larger than this is treated as black
-int turnSpeed = 100;           // running too fast sometimes results in missed IR scans as array sweeps too fast over a line
+int turnSpeed = 110;           // running too fast sometimes results in missed IR scans as array sweeps too fast over a line
 int pivotSpeed = 100;          // ...or overshoots a target position
 int nodeCheckSpeed = 100;      // ...or advances farther than necessary for a second reading
+int nodeBump = 130;             // degrees of extra nudge forward after detecting a node to improve node-to-node measurements
+int pivotBump = 0;             // was uTurnBump, still needed?
+int nodeCheckDelay = 600;      // time to pause and allow bot to stop moving before evaluating a found node
+
 char facing = 'N';             // direction bot is facing. N, S, E, W (North, South, East, West)
+int reconMode = 0;             // maze recon mode 0 = on, 1 = off
+int locx = 0;                  // location on x axis
+int locy = 0;                  // location on y axis
+
 int leftDistanceCumulative = 0;
 int rightDistanceCumulative = 0;
 int leftDistancePrevious = 0;
@@ -107,9 +115,6 @@ int rightDistancePrevious = 0;
 int leftDistanceTraveled = 0;
 int rightDistanceTraveled = 0;
 int avgDistanceTraveled = 0;
-int reconMode = 0;             // maze recon mode 0 = on, 1 = off
-int nodeBump = 120;             // extra nudge forward after detecting a node to improve node-to-node measurements
-int uTurnBump = 0;
 
 ////////////////////////////////////////////////////////////////////////
 // Setup
@@ -320,10 +325,10 @@ int getDistance(){      // determine distance from last time this fucntion was c
                         // TODO will bot need to track distances on final run? Or just know sequence of valid nodes and run those?
 
   allStop();
-  delay(500);
+  delay(400);
   leftDistanceCumulative = Motor1.readPosition();                          // obtain encoder reading
   rightDistanceCumulative = Motor2.readPosition();                         // obtain encoder reading
-  delay(100);                                                              // TODO is this delay necessary to read the positions?
+  delay(10);                                                              // TODO is this delay necessary to read the positions?
   leftDistanceTraveled = leftDistanceCumulative - leftDistancePrevious;    // calculate distance traveled
   rightDistanceTraveled = rightDistanceCumulative - rightDistancePrevious;  // calculate distance traveled
   if (leftDistanceTraveled > 0 && rightDistanceTraveled > 0){
@@ -355,7 +360,7 @@ int getDistance(){      // determine distance from last time this fucntion was c
   leftDistancePrevious = leftDistanceCumulative;           // reset starting point for next leg
   rightDistancePrevious = rightDistanceCumulative;         // reset starting point for next leg
   
-  delay(1000); // TODO remove debugging delay
+  delay(200); // TODO remove debugging delay
   
   return avgDistanceTraveled;
   
@@ -622,7 +627,7 @@ int checkForNode(){
   if (sensorValues[1] > IRblack && sensorValues[2] > IRblack && sensorValues[3] > IRblack && sensorValues[4] > IRblack && sensorValues[5] > IRblack && sensorValues[6] > IRblack)
   {
     allStop();
-    delay(400);  // give bot a moment to come to a stop before taking a second reading
+    delay(nodeCheckDelay);  // give bot a moment to come to a stop before taking a second reading
     
     //if (reconMode == 0){
     //  getDistance();
@@ -655,7 +660,7 @@ int checkForNode(){
   // check for node 9 and 4 (9 is 90 degree right turn, 4 is right hand T)
   if ((sensorValues[0] > IRblack && sensorValues[1] > IRblack && sensorValues[2] > IRblack) && (sensorValues[6] < IRwhite && sensorValues[7] < IRwhite)) {
     allStop();
-    delay(400);  // give bot a moment to come to a stop before taking a second reading
+    delay(nodeCheckDelay);  // give bot a moment to come to a stop before taking a second reading
     qtra.readLine(sensorValuesB); // take a second reading, but don't overwrite the orignal checkForNode reading
     delay(10);
 
@@ -677,7 +682,7 @@ int checkForNode(){
   // check for node 10 and 5 (10 is a 90 degree left turn, 5 is right left hand T)
   if ((sensorValues[0] < IRwhite && sensorValues[1] < IRwhite) && (sensorValues[5] > IRblack && sensorValues[6] > IRblack && sensorValues[7] > IRblack)) {
     allStop();
-    delay(400);  // give bot a moment to come to a stop before taking a second reading
+    delay(nodeCheckDelay);  // give bot a moment to come to a stop before taking a second reading
     qtra.readLine(sensorValuesB);
     delay(10);
     
@@ -700,7 +705,7 @@ int checkForNode(){
   // I was reading a line and now *BAM* no line whatsoever. Must be a dead end.
   if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){    
     allStop();
-    delay(400);  // give bot a moment to come to a stop before taking a second reading
+    delay(nodeCheckDelay);  // give bot a moment to come to a stop before taking a second reading
     Serial3.println("ret 6");
     return 6;
   }
@@ -780,10 +785,10 @@ int pivotRight(int speed){                         // robot rotates by pivoting 
 
   Serial3.println("pivot right");
   // move straight forward a bit to provide more room to resume line following after completing the U-Turn manuever
-  uTurnBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???)
-  Motor1.move(BACKWARD, nodeCheckSpeed, uTurnBump, BRAKE);  // TODO move nodeBump to separate function since maze solver will use, but line follower may not
-  Motor2.move(BACKWARD, nodeCheckSpeed, uTurnBump, BRAKE);
-  delay(400); // allow previous maneuver to complete
+  pivotBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???) TODO remove this?
+  Motor1.move(BACKWARD, nodeCheckSpeed, pivotBump, BRAKE);  // TODO move nodeBump to separate function since maze solver will use, but line follower may not
+  Motor2.move(BACKWARD, nodeCheckSpeed, pivotBump, BRAKE);
+  delay(nodeCheckDelay); // allow previous maneuver to complete
 
   // bot might be on a current line so get off the current line
   while (sensorValues[2] > IRblack || sensorValues[3] > IRblack || sensorValues[4] > IRblack || sensorValues[5] > IRblack || sensorValues[6] > IRblack || sensorValues[7] > IRblack){
@@ -795,7 +800,8 @@ int pivotRight(int speed){                         // robot rotates by pivoting 
   
   // continue rotating until line reached
   //while (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
-  while (sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite){
+  //while (sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite){
+  while (IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite){
     Motor1.move(BACKWARD, speed);
     Motor2.move(FORWARD, speed);
     qtra.readLine(sensorValues);
@@ -808,10 +814,10 @@ int pivotLeft(int speed){                         // robot rotates by pivoting i
   Serial3.println("pivot left");
   // move straight forward a bit to improve node-to-node measurments...
   // and provide more room to resume line following after completing the U-Turn manuever
-  uTurnBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???)
-  Motor1.move(BACKWARD, nodeCheckSpeed, uTurnBump, BRAKE);  // TODO move nodeBump to separate function since maze solver will use, but line follower may not
-  Motor2.move(BACKWARD, nodeCheckSpeed, uTurnBump, BRAKE);
-  delay(400); // allow previous maneuver to complete
+  pivotBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???)
+  Motor1.move(BACKWARD, nodeCheckSpeed, pivotBump, BRAKE);  // TODO move nodeBump to separate function since maze solver will use, but line follower may not
+  Motor2.move(BACKWARD, nodeCheckSpeed, pivotBump, BRAKE);
+  delay(nodeCheckDelay); // allow previous maneuver to complete
 
   // bot might be on a current line so get off the current line
   while (sensorValues[0] > IRblack || sensorValues[1] > IRblack || sensorValues[2] > IRblack || sensorValues[3] > IRblack || sensorValues[4] > IRblack || sensorValues[5] > IRblack){
@@ -823,7 +829,8 @@ int pivotLeft(int speed){                         // robot rotates by pivoting i
   
   // continue rotating until line reached
   //while (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
-  while (sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite){
+  //while (sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite){
+  while (sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite){
     Motor1.move(FORWARD, speed);
     Motor2.move(BACKWARD, speed);
     qtra.readLine(sensorValues);
