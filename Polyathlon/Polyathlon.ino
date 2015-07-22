@@ -87,6 +87,7 @@ int lastError = 0;
 //SoftwareSerial bluetooth(bluetoothTx, bluetoothRx); // uncomment this line for use with Arduino UNO, comment out for Mega 2560
 int bluetoothTx = 14;           // TX-O pin of bluetooth (Mega 2560 pin 14)
 int bluetoothRx = 15;           // RX-I pin of bluetooth (Mega 2560 pin 15)
+SoftwareSerial bluetooth(bluetoothTx, bluetoothRx);
 
 ////////////////////////////////////////////////////////////////////////
 // Prepare misc variables
@@ -103,7 +104,7 @@ int nodeBump = 130;             // degrees of extra nudge forward after detectin
 int pivotBump = 0;             // was uTurnBump, still needed?
 int nodeCheckDelay = 600;      // time to pause and allow bot to stop moving before evaluating a found node
 
-char facing = 'N';             // direction bot is facing. N, S, E, W (North, South, East, West)
+char heading = 'n';             // direction bot is heading. n, s, e, w (North, South, East, West)
 int reconMode = 0;             // maze recon mode 0 = on, 1 = off
 int locx = 0;                  // location on x axis
 int locy = 0;                  // location on y axis
@@ -121,9 +122,21 @@ int avgDistanceTraveled = 0;
 void setup()
 {
   //Serial.begin(115200);          // initialize serial communication over USB
-  Serial3.begin(115200);           // Begin the serial monitor over BlueTooth. Use with Arduino Mega 2560 w/ pins 14,15
-                                 // seems to only support 9600 baud rate (??), 19200 is garbled, 115200 is nothing
+  //Serial3.begin(115200);           // Begin the serial monitor over BlueTooth. Use with Arduino Mega 2560 w/ pins 14,15
+                                // seems to only support 9600 baud rate (??), 19200 is garbled, 115200 is nothing
                                  // TODO baud rates supported by Mega 2560?
+  
+  Serial.begin(9600);
+  bluetooth.begin(115200);
+  delay(320);
+  bluetooth.print("$");
+  bluetooth.print("$");
+  bluetooth.print("$");
+  delay(100);
+  bluetooth.println("U,9600,N");
+  bluetooth.begin(9600);
+
+  
   pinMode(ledPin, OUTPUT);       // initialize the digital pin as an output
 
 } // close void setup()
@@ -251,8 +264,8 @@ int testBlueToothSerial(){
 int calibrateIRarray(){
     int i;
   
-    Serial.println("Running calibration (see the blinky red light)?");
-    Serial3.println("Running calibration (see the blinky red light)?");
+    //Serial.println("Running calibration (see the blinky red light)?");
+    bluetooth.println("Running calibration (see the blinky red light)?");
     for (i = 0; i < 100; i++)      // run calibration for a few seconds (reduced from 200 to 100)
     {
       digitalWrite(ledPin, HIGH);  // turn on LED (flicker LED during calibration)
@@ -266,29 +279,29 @@ int calibrateIRarray(){
     for (i = 0; i < NUM_SENSORS; i++)
     {
       Serial.print(qtra.calibratedMinimumOn[i]);
-      Serial3.print(qtra.calibratedMinimumOn[i]);
+      bluetooth.print(qtra.calibratedMinimumOn[i]);
       Serial.print(' ');
-      Serial3.print(' ');
+      bluetooth.print(' ');
     }
     Serial.println();
-    Serial3.println();
+    bluetooth.println();
     // print the calibration MAXimum values measured when emitters were on
     for (i = 0; i < NUM_SENSORS; i++)
     {
       Serial.print(qtra.calibratedMaximumOn[i]);
-      Serial3.print(qtra.calibratedMaximumOn[i]);
+      bluetooth.print(qtra.calibratedMaximumOn[i]);
       Serial.print(' ');
-      Serial3.print(' ');
+      bluetooth.print(' ');
     }
     Serial.println("Leaving calibrateIRarray function");
-    Serial3.println("Leaving calibrateIRarray function");
+    bluetooth.println("Leaving calibrateIRarray function");
 } // close calibrateIRarray function
 
 
 ////////////////////////////////////////////////////////////////////////
 int pause(){
   Serial.println("entering pause function");
-  Serial3.println("entering pause function");
+  bluetooth.println("entering pause function");
   // standby until momentary button is pressed
   // useful after calibration is complete, but before the event starts
   allStop();
@@ -301,13 +314,16 @@ int pause(){
     digitalWrite(ledPin, LOW);     // turn off LED
     delay(250); 
   }
-  Serial.println("Button A pressed! Start 5 second delay...");
-  Serial3.println("Button A pressed! Start 5 second delay...");
+  //Serial.println("Button A pressed! Start 5 second delay...");
+  //Serial3.println("Button A pressed! Start 5 second delay...");
+  bluetooth.println("Button A pressed! Start 5 second delay...");
   delay(5000);
-  Serial.println("Time's up! Leaving pause loop.");
-  Serial3.println("Time's up! Leaving pause loop.");
-  Serial.println(" ");
-  Serial3.println(" ");
+  //Serial.println("Time's up! Leaving pause loop.");
+  //Serial3.println("Time's up! Leaving pause loop.");
+  bluetooth.println("Time's up! Leaving pause loop.");
+  //Serial.println(" ");
+  //Serial3.println(" ");
+  bluetooth.println(" ");
 }
 
 
@@ -353,9 +369,9 @@ int getDistance(){      // determine distance from last time this fucntion was c
   Serial3.println(rightDistanceTraveled);
   */
   
-  Serial3.print("Distance: ");
-  Serial3.println(avgDistanceTraveled);
-  Serial3.println(" ");
+  bluetooth.print("Distance: ");
+  bluetooth.println(avgDistanceTraveled);
+  bluetooth.println(" ");
     
   leftDistancePrevious = leftDistanceCumulative;           // reset starting point for next leg
   rightDistancePrevious = rightDistanceCumulative;         // reset starting point for next leg
@@ -446,6 +462,7 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
       getDistance();          //      obtain distance reading from previous node
       //turnRight(turnSpeed);
       pivotRight(pivotSpeed);
+      updateHeading(0); //      assuming all lines are 90 degrees
       getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
@@ -457,6 +474,7 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
       getDistance();          //      obtain distance reading from previous node
       //turnRight(turnSpeed);
       pivotRight(pivotSpeed);
+      updateHeading(0);
       getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
 
@@ -465,6 +483,7 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
       getDistance();          //      obtain distance reading from previous node
       //turnRight(turnSpeed);
       pivotRight(pivotSpeed);
+      updateHeading(0);
       getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
@@ -476,6 +495,7 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
     case 6:                   // 6  - dead end line (bot must stop or complete a U-turn)
       getDistance();          //      obtain distance reading from previous node
       pivotRight(pivotSpeed);
+      updateHeading(2);
       getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
       
@@ -483,6 +503,7 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
       getDistance();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
       //turnRight(turnSpeed);
       pivotRight(pivotSpeed);
+      updateHeading(0);
       getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
@@ -490,6 +511,7 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
       getDistance();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
       //turnLeft(turnSpeed);
       pivotLeft(pivotSpeed);
+      updateHeading(1);
       getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
@@ -638,20 +660,20 @@ int checkForNode(){
     
     if ((sensorValuesB[0] < IRwhite && sensorValuesB[7] < IRwhite) && (sensorValuesB[3] > IRblack || sensorValuesB[4] > IRblack)){
       // outer sensors see white and at least one of the middle sensors sees black
-        Serial3.println("ret 1");
+        //Serial3.println("ret 1");
         return 1;  
     }
     
     if (sensorValuesB[2] > IRblack && sensorValuesB[3] > IRblack && sensorValuesB[4] > IRblack && sensorValuesB[5] > IRblack) // reduced to middle four sensors
     {      
       reconMode = 1;
-      Serial3.println("ret 2");
+      //Serial3.println("ret 2");
       return 2;
     }
 
     if (sensorValuesB[0] < IRwhite && sensorValuesB[1] < IRwhite && sensorValuesB[2] < IRwhite && sensorValuesB[3] < IRwhite && sensorValuesB[4] < IRwhite && sensorValuesB[5] < IRwhite && sensorValuesB[6] < IRwhite && sensorValuesB[7] < IRwhite)
     {
-      Serial3.println("ret 3");
+      //Serial3.println("ret 3");
       return 3;
     }
   } //end of check for intersections 1, 2, and 3
@@ -666,14 +688,14 @@ int checkForNode(){
 
     // check for all white
     if (sensorValuesB[0] < IRwhite && sensorValuesB[1] < IRwhite && sensorValuesB[2] < IRwhite && sensorValuesB[3] < IRwhite && sensorValuesB[4] < IRwhite && sensorValuesB[5] < IRwhite && sensorValuesB[6] < IRwhite && sensorValuesB[7] < IRwhite){      
-      Serial3.println("ret 9");
+      //Serial3.println("ret 9");
       return 9;
     }
     
     // check for 3 way intersection (bot can turn right, or continue straight)
     if ((sensorValuesB[0] < IRwhite && sensorValuesB[7] < IRwhite) && (sensorValuesB[3] > IRblack || sensorValuesB[4] > IRblack)){
       // outer sensors see white and at least one of the middle sensors sees black        
-      Serial3.println("ret 4");
+      //Serial3.println("ret 4");
       return 4;
     }
   }  // close check for node 9 and 4
@@ -688,14 +710,14 @@ int checkForNode(){
     
     // check for all white
     if (sensorValuesB[0] < IRwhite && sensorValuesB[1] < IRwhite && sensorValuesB[2] < IRwhite && sensorValuesB[3] < IRwhite && sensorValuesB[4] < IRwhite && sensorValuesB[5] < IRwhite && sensorValuesB[6] < IRwhite && sensorValuesB[7] < IRwhite){
-      Serial3.println("ret 10");
+      //Serial3.println("ret 10");
       return 10;
     }
     
     // check for 3 way intersection (bot can turn left, or continue straight)
     if ((sensorValuesB[0] < IRwhite && sensorValuesB[7] < IRwhite) && (sensorValuesB[3] > IRblack || sensorValuesB[4] > IRblack)){
       // outer sensors see white and at least one of the middle sensors sees black
-      Serial3.println("ret 5");
+      //Serial3.println("ret 5");
       return 5;
     }
   }  // close check for node 10 and 5
@@ -706,7 +728,7 @@ int checkForNode(){
   if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){    
     allStop();
     delay(nodeCheckDelay);  // give bot a moment to come to a stop before taking a second reading
-    Serial3.println("ret 6");
+    //Serial3.println("ret 6");
     return 6;
   }
 
@@ -733,20 +755,7 @@ int turnRight(int speed){
     qtra.readLine(sensorValues);
     delay(10);  // give a chance for sensors to finish reading?
   }
-  
-  /* original turnRight code that rotated the outside wheel a certain number of degrees, then stopped.  
-  //Serial.println("Entering turnRight function");
-  //Serial3.println("Entering turnRight function");
-  Motor1.move(BACKWARD, speed, degrees, BRAKE);
-  delay(1500);            //      give bot a moment to complete the turn
-  // TODO change this function to accept degrees as intended rotation of bot itself
-  // and calculate the wheel movement necessary to accomplish. ie: "I want my bot
-  // to turn 90 degrees to the right" is more intuitive than "I want my left wheel
-  // to rotate 270-ish degrees to accomplish a right hand turn."
-  //
-  */ 
 } // close turnRight function
-
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -767,23 +776,14 @@ int turnLeft(int speed){               // robot turns left by pivoting on the le
     qtra.readLine(sensorValues);
     delay(10);  // give a chance for sensors to finish reading
   }
-
-  /*
-  //Serial.println("Entering turnLeft function");
-  //Serial3.println("Entering turnLeft function");
-  Motor2.move(BACKWARD, speed, degrees, BRAKE);
-  delay(1500);            //      give bot a moment to complete the turn
-  // TODO change this function to accept degrees as intended rotation of bot itself
-  // and calculate the wheel movement necessary to accomplish. ie: "I want my bot
-  // to turn 90 degrees to the left" is more intuitive than "I want my right wheel
-  // to rotate 270-ish degrees to accomplish a left hand turn."
-  */
-  
 } // close turnLeft function
 
+
+////////////////////////////////////////////////////////////////////////
 int pivotRight(int speed){                         // robot rotates by pivoting in place (turning both wheels in opposite directions)
 
-  Serial3.println("pivot right");
+  //Serial3.println("pivot right");
+  bluetooth.println("pivot right");
   // move straight forward a bit to provide more room to resume line following after completing the U-Turn manuever
   pivotBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???) TODO remove this?
   Motor1.move(BACKWARD, nodeCheckSpeed, pivotBump, BRAKE);  // TODO move nodeBump to separate function since maze solver will use, but line follower may not
@@ -809,9 +809,10 @@ int pivotRight(int speed){                         // robot rotates by pivoting 
   }
 } // close pivotRight function
 
+////////////////////////////////////////////////////////////////////////
 int pivotLeft(int speed){                         // robot rotates by pivoting in place (turning both wheels in opposite directions)
 
-  Serial3.println("pivot left");
+  bluetooth.println("pivot left");
   // move straight forward a bit to improve node-to-node measurments...
   // and provide more room to resume line following after completing the U-Turn manuever
   pivotBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???)
@@ -839,6 +840,28 @@ int pivotLeft(int speed){                         // robot rotates by pivoting i
 } // close pivotLeft function
 
 ////////////////////////////////////////////////////////////////////////
+int updateHeading(int pivotType){
+  // pivotType can be one of "right" "left" or "uTurn"
+  switch (pivotType) {
+    case 0:
+      bluetooth.println("change heading right");
+      delay(10);
+      break;
+
+    case 1:
+      bluetooth.println("change heading left");
+      delay(10);
+      break;
+
+    case 2:
+      bluetooth.println("change heading uTurn");
+      delay(10);
+      break;
+  }
+}  // close updateHeading function
+
+
+////////////////////////////////////////////////////////////////////////
 int checkForSwitchback(){
   // 
 }
@@ -847,5 +870,6 @@ int checkForSwitchback(){
 int checkForEdge(){
   // check for edge of table
 }
+
 
 
