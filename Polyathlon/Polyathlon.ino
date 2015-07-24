@@ -109,19 +109,22 @@ int reconMode = 0;             // maze recon mode 0 = on, 1 = off
 int locx = 0;                  // location on x axis
 int locy = 0;                  // location on y axis
 
-int leftDistanceCumulative = 0;
-int rightDistanceCumulative = 0;
-int leftDistancePrevious = 0;
-int rightDistancePrevious = 0;
-int leftDistanceTraveled = 0;
-int rightDistanceTraveled = 0;
-int avgDistanceTraveled = 0;
+int leftDegreesCumulative = 0;
+int rightDegreesCumulative = 0;
+int leftDegreesPrevious = 0;
+int rightDegreesPrevious = 0;
+int leftDegreesTraveled = 0;
+int rightDegreesTraveled = 0;
+int avgDegreesTraveled = 0;
 
 float inches = 0;
 int wheelCirc = 8;   // wheel circumference in inches
-float previousLeg = 0;
 
-int nodeLoc[2] = {0, 0};
+float legPreviousDegrees = 0;
+float legPreviousInches = 0;
+
+int nodeLocCurrent[2] = {0, 0};
+int nodeLocPrevious[2] = {0, 0};
 
 ////////////////////////////////////////////////////////////////////////
 // Setup
@@ -165,11 +168,12 @@ void loop()
   //mazeSolverModeRHS();         // bot acts like a maze solver using Right Hand Side algorithm
   //mazeSolverModeLHS();         // bot acts like a maze solver using Left Hand Side algorithm
   //testNXTEncoders();
-  //getDistance();
+  //getDegrees();
   /////mazeSolverModeRHSPruning();    // bot acts like a maze solver using Right Hand Side algorithm with loop pruning
-
-  currentLoc();
-  delay(1000);
+  mazeSolverModeSolved();
+  
+  //currentLoc();
+  //delay(1000);
 
   // check for test run length
   TestRuns++;
@@ -344,52 +348,53 @@ int allStop(){                                  // turn off drive motors
 }
 
 ////////////////////////////////////////////////////////////////////////
-int getDistance(){      // determine distance from last time this fucntion was called until this time
+int getDegrees(){      // TODO rename to getEncoderTics or something more accurate, meaningful
+                        // determine distance from last time this fucntion was called until this time
                         // 'distance' is currently measured in wheel encoder tics (not inches or cm)
                         //
                         // TODO will bot need to track distances on final run? Or just know sequence of valid nodes and run those?
-
+  bluetooth.println("Entering getDegrees function");
   allStop();
   delay(400);
-  leftDistanceCumulative = Motor1.readPosition();                          // obtain encoder reading
-  rightDistanceCumulative = Motor2.readPosition();                         // obtain encoder reading
+  leftDegreesCumulative = Motor1.readPosition();                          // obtain encoder reading
+  rightDegreesCumulative = Motor2.readPosition();                         // obtain encoder reading
   delay(10);                                                              // TODO is this delay necessary to read the positions?
-  leftDistanceTraveled = leftDistanceCumulative - leftDistancePrevious;    // calculate distance traveled
-  rightDistanceTraveled = rightDistanceCumulative - rightDistancePrevious;  // calculate distance traveled
-  if (leftDistanceTraveled > 0 && rightDistanceTraveled > 0){
-    avgDistanceTraveled = (leftDistanceTraveled + rightDistanceTraveled) / 2;
+  leftDegreesTraveled = leftDegreesCumulative - leftDegreesPrevious;    // calculate distance traveled
+  rightDegreesTraveled = rightDegreesCumulative - rightDegreesPrevious;  // calculate distance traveled
+  if (leftDegreesTraveled > 0 && rightDegreesTraveled > 0){
+    avgDegreesTraveled = (leftDegreesTraveled + rightDegreesTraveled) / 2;
   }
-  if (leftDistanceTraveled == 0 && rightDistanceTraveled == 0){
-    avgDistanceTraveled = 0;
+  if (leftDegreesTraveled == 0 && rightDegreesTraveled == 0){
+    avgDegreesTraveled = 0;
   }
 
   /*
   Serial3.print("Total: ");
-  Serial3.print(leftDistanceCumulative);
+  Serial3.print(leftDegreesCumulative);
   Serial3.print(" ");
-  Serial3.println(rightDistanceCumulative);
+  Serial3.println(rightDegreesCumulative);
   Serial3.print("Prev: ");
-  Serial3.print(leftDistancePrevious);
+  Serial3.print(leftDegreesPrevious);
   Serial3.print(" ");
-  Serial3.println(rightDistancePrevious);
+  Serial3.println(rightDegreesPrevious);
   Serial3.print("This leg: ");
-  Serial3.print(leftDistanceTraveled);
+  Serial3.print(leftDegreesTraveled);
   Serial3.print(" ");
-  Serial3.println(rightDistanceTraveled);
+  Serial3.println(rightDegreesTraveled);
   */
   
-  bluetooth.print("Distance: ");
-  bluetooth.println(avgDistanceTraveled);
+  bluetooth.print("avgDegreesTraveled: ");  // really, it's avg encoder tics accumulated
+  bluetooth.println(avgDegreesTraveled);
   bluetooth.println(" ");
     
-  leftDistancePrevious = leftDistanceCumulative;           // reset starting point for next leg
-  rightDistancePrevious = rightDistanceCumulative;         // reset starting point for next leg
+  leftDegreesPrevious = leftDegreesCumulative;           // reset starting point for next leg
+  rightDegreesPrevious = rightDegreesCumulative;         // reset starting point for next leg
   
   delay(200); // TODO remove debugging delay
   
-  return avgDistanceTraveled;
+  return avgDegreesTraveled;
   
-} // close getDistance function
+} // close getDegrees function
 
 ////////////////////////////////////////////////////////////////////////
 int lineFollowerMode(){                  // bot acts like a line follower
@@ -468,11 +473,11 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
       break;
 
     case 1:                   // 1  - four way intersection (bot can turn left, right, or continue straight)
-      getDistance();          //      obtain distance reading from previous node
+      getDegrees();          //      obtain distance reading from previous node
       //turnRight(turnSpeed);
       pivotRight(pivotSpeed);
       updateHeading(0); //      assuming all lines are 90 degrees
-      getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
+      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
     case 2:                   // 2  - black square (finish box for maze solving)
@@ -480,57 +485,62 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
       break;
     
     case 3:                   // 3  - dead end T intersection (bot can turn left or right)
-      getDistance();          //      obtain distance reading from previous node
+      getDegrees();          //      obtain distance reading from previous node
       //turnRight(turnSpeed);
       pivotRight(pivotSpeed);
       updateHeading(0);
-      getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
+      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
 
     
     case 4:                   // 4  - right hand T intersection (bot can turn right or continue straight)
-      getDistance();          //      obtain distance reading from previous node
+      getDegrees();          //      obtain distance reading from previous node
       //turnRight(turnSpeed);
       pivotRight(pivotSpeed);
       updateHeading(0);
-      getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
+      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
     case 5:                   // 5  - left hand T intersection (bot can turn left or continue straight)
-      getDistance();          //      obtain distance reading from previous node
+      getDegrees();          //      obtain distance reading from previous node
       // RHS so just go straight
       break;
     
     case 6:                   // 6  - dead end line (bot must stop or complete a U-turn)
-      getDistance();          //      obtain distance reading from previous node
+      getDegrees();          //      obtain distance reading from previous node
       pivotRight(pivotSpeed);
       updateHeading(2);
-      getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
+      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
       
     case 9:                   // 9  - 90 degree right turn (bot can only turn right) need to identify such nodes for building a coordinate grid of a maze
-      getDistance();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
+      getDegrees();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
       //turnRight(turnSpeed);
       pivotRight(pivotSpeed);
       updateHeading(0);
-      getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
+      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
     case 10:                  // 10 - 90 degree left turn (bot can only turn left) need to identify such nodes for building a coordinate grid of a maze
-      //getDistance();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
+      //getDegrees();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
       //turnLeft(turnSpeed);
+
+      pause();
+      
+      /*             FIX this back to basic RHS
       bump();
       delay(250);
-      previousLeg = degreesToInches(getDistance());          //  distance measured at this point 
+      legPreviousInches = degreesToInches(getDegrees());          //  distance measured at this point 
       bluetooth.print("Distance of previous leg: ");
-      bluetooth.print(previousLeg);
+      bluetooth.print(legPreviousInches);
       bluetooth.println(" inches");
       delay(5000);
-      
       pivotLeft(pivotSpeed);
       delay(3000);
+      
       updateHeading(1);
-      getDistance();  // reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
+      getDegrees();  // reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
+      */
       break;
     
     default:
@@ -542,6 +552,94 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
   followLine();
   
 } // close mazeSolverModeRHSPruning
+
+
+////////////////////////////////////////////////////////////////////////
+int mazeSolverModeSolved(){      // bot acts like a maze solver using Right Hand Side algorithm with loop pruning
+  
+  nodeType = checkForNode();
+
+  switch (nodeType) {
+    case 0:                   // 0  - no node detected
+      //followLine();
+      break;
+
+    case 1:                   // 1  - four way intersection (bot can turn left, right, or continue straight)
+      getDegrees();          //      obtain distance reading from previous node
+      //turnRight(turnSpeed);
+      pivotRight(pivotSpeed);
+      updateHeading(0); //      assuming all lines are 90 degrees
+      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
+      break;
+    
+    case 2:                   // 2  - black square (finish box for maze solving)
+      pause();
+      break;
+    
+    case 3:                   // 3  - dead end T intersection (bot can turn left or right)
+      getDegrees();          //      obtain distance reading from previous node
+      //turnRight(turnSpeed);
+      pivotRight(pivotSpeed);
+      updateHeading(0);
+      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
+      break;
+
+    
+    case 4:                   // 4  - right hand T intersection (bot can turn right or continue straight)
+      getDegrees();          //      obtain distance reading from previous node
+      //turnRight(turnSpeed);
+      pivotRight(pivotSpeed);
+      updateHeading(0);
+      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
+      break;
+    
+    case 5:                   // 5  - left hand T intersection (bot can turn left or continue straight)
+      getDegrees();          //      obtain distance reading from previous node
+      // RHS so just go straight
+      break;
+    
+    case 6:                   // 6  - dead end line (bot must stop or complete a U-turn)
+      getDegrees();          //      obtain distance reading from previous node
+      pivotRight(pivotSpeed);
+      updateHeading(2);
+      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
+      break;
+      
+    case 9:                   // 9  - 90 degree right turn (bot can only turn right) need to identify such nodes for building a coordinate grid of a maze
+      getDegrees();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
+      //turnRight(turnSpeed);
+      pivotRight(pivotSpeed);
+      updateHeading(0);
+      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
+      break;
+    
+    case 10:                  // 10 - 90 degree left turn (bot can only turn left) need to identify such nodes for building a coordinate grid of a maze
+      
+      //turnLeft(turnSpeed);
+      bump();
+      delay(250);
+      legPreviousInches = degreesToInches(getDegrees());          //  distance measured at this point 
+      currentLoc();
+      delay(5000);
+      pivotLeft(pivotSpeed);
+      getDegrees();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
+      delay(3000);
+      
+      updateHeading(1);
+      getDegrees();  // reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
+      break;
+    
+    default:
+      //followLine();
+      break;
+    
+  } // close switch statement
+  
+  followLine();
+  
+} // close mazeSolverModeRHSPruning
+
+
 
 ////////////////////////////////////////////////////////////////////////
 int mazeSolverModeLHS(){      // bot acts like a maze solver using Left Hand Side algorithm
@@ -670,7 +768,7 @@ int checkForNode(){
     delay(nodeCheckDelay);  // give bot a moment to come to a stop before taking a second reading
     
     //if (reconMode == 0){
-    //  getDistance();
+    //  getDegrees();
     //}
     
     qtra.readLine(sensorValuesB);                      // obtain reading after just passing over a line
@@ -908,8 +1006,14 @@ float degreesToInches(int degrees){
 }  // close degreesToInches
 
 int currentLoc(){
-  bluetooth.print("previous node was ");
-  int i; for (i = 0; i < 2; i++) { bluetooth.print(nodeLoc[i]);bluetooth.print(" ");} bluetooth.println(" ");
+  bluetooth.println("entering currentLoc function");
+  bluetooth.print("nodeLocPrevious ");
+  int i; for (i = 0; i < 2; i++) { bluetooth.print(nodeLocPrevious[i]);bluetooth.print(" ");} bluetooth.println(" ");
+  bluetooth.print("legPreviousInches: ");
+  bluetooth.println(legPreviousInches, 4);
+  bluetooth.print("heading: ");
+  bluetooth.println(heading);
+  
 }  // close currentLoc
 
 ////////////////////////////////////////////////////////////////////////
