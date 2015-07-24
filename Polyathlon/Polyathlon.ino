@@ -100,7 +100,7 @@ int IRblack = 600;             // any IR value larger than this is treated as bl
 int turnSpeed = 110;           // running too fast sometimes results in missed IR scans as array sweeps too fast over a line
 int pivotSpeed = 100;          // ...or overshoots a target position
 int nodeCheckSpeed = 100;      // ...or advances farther than necessary for a second reading
-int nodeBump = 130;             // degrees of extra nudge forward after detecting a node to improve node-to-node measurements
+int nodeBump = 125;             // degrees of extra nudge forward after detecting a node to improve node-to-node measurements
 int pivotBump = 0;             // was uTurnBump, still needed?
 int nodeCheckDelay = 600;      // time to pause and allow bot to stop moving before evaluating a found node
 
@@ -116,6 +116,12 @@ int rightDistancePrevious = 0;
 int leftDistanceTraveled = 0;
 int rightDistanceTraveled = 0;
 int avgDistanceTraveled = 0;
+
+float inches = 0;
+int wheelCirc = 8;   // wheel circumference in inches
+float previousLeg = 0;
+
+int nodeLoc[2] = {0, 0};
 
 ////////////////////////////////////////////////////////////////////////
 // Setup
@@ -158,9 +164,12 @@ void loop()
   //lineFollowerMode();          // bot acts like a line follower
   //mazeSolverModeRHS();         // bot acts like a maze solver using Right Hand Side algorithm
   //mazeSolverModeLHS();         // bot acts like a maze solver using Left Hand Side algorithm
-  mazeSolverModeRHSPruning();    // bot acts like a maze solver using Right Hand Side algorithm with loop pruning
   //testNXTEncoders();
   //getDistance();
+  /////mazeSolverModeRHSPruning();    // bot acts like a maze solver using Right Hand Side algorithm with loop pruning
+
+  currentLoc();
+  delay(1000);
 
   // check for test run length
   TestRuns++;
@@ -508,11 +517,20 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
       break;
     
     case 10:                  // 10 - 90 degree left turn (bot can only turn left) need to identify such nodes for building a coordinate grid of a maze
-      getDistance();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
+      //getDistance();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
       //turnLeft(turnSpeed);
+      bump();
+      delay(250);
+      previousLeg = degreesToInches(getDistance());          //  distance measured at this point 
+      bluetooth.print("Distance of previous leg: ");
+      bluetooth.print(previousLeg);
+      bluetooth.println(" inches");
+      delay(5000);
+      
       pivotLeft(pivotSpeed);
+      delay(3000);
       updateHeading(1);
-      getDistance();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
+      getDistance();  // reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
     default:
@@ -813,12 +831,15 @@ int pivotRight(int speed){                         // robot rotates by pivoting 
 int pivotLeft(int speed){                         // robot rotates by pivoting in place (turning both wheels in opposite directions)
 
   bluetooth.println("pivot left");
+  
+  /*
   // move straight forward a bit to improve node-to-node measurments...
   // and provide more room to resume line following after completing the U-Turn manuever
   pivotBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???)
   Motor1.move(BACKWARD, nodeCheckSpeed, pivotBump, BRAKE);  // TODO move nodeBump to separate function since maze solver will use, but line follower may not
   Motor2.move(BACKWARD, nodeCheckSpeed, pivotBump, BRAKE);
   delay(nodeCheckDelay); // allow previous maneuver to complete
+  */
 
   // bot might be on a current line so get off the current line
   while (sensorValues[0] > IRblack || sensorValues[1] > IRblack || sensorValues[2] > IRblack || sensorValues[3] > IRblack || sensorValues[4] > IRblack || sensorValues[5] > IRblack){
@@ -838,6 +859,20 @@ int pivotLeft(int speed){                         // robot rotates by pivoting i
     delay(10);  // give a chance for sensors to finish reading?
   }
 } // close pivotLeft function
+
+int bump(){
+  // Compensate for bot stopping when line detected.
+  // We want to measure distances between node at a point beneath the rear axel / pivot point.
+  // But the bot stops immedately upon detecting a line (which is good).
+  // This bump is intended to nudge the robot forward so the node is directly beneath the rear axel.
+  
+  // move straight forward a bit to improve node-to-node measurments...
+  // and provide more room to resume line following after completing the U-Turn manuever
+  //pivotBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???)
+  Motor1.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);  // TODO move nodeBump to separate function since maze solver will use, but line follower may not
+  Motor2.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);
+  delay(nodeCheckDelay); // allow previous maneuver to complete
+}
 
 ////////////////////////////////////////////////////////////////////////
 int updateHeading(int pivotType){
@@ -860,6 +895,22 @@ int updateHeading(int pivotType){
   }
 }  // close updateHeading function
 
+float degreesToInches(int degrees){
+  bluetooth.print("degrees coming into degreesToInches: ");
+  bluetooth.println(degrees);
+  bluetooth.print("wheelCirc: ");
+  bluetooth.println(wheelCirc);
+  // convert wheel encoder tics to inches based on 8 inch circumference wheel
+  inches = (degrees / 360.0) * wheelCirc;
+  bluetooth.print("inches: ");
+  bluetooth.println(inches);
+  return inches;
+}  // close degreesToInches
+
+int currentLoc(){
+  bluetooth.print("previous node was ");
+  int i; for (i = 0; i < 2; i++) { bluetooth.print(nodeLoc[i]);bluetooth.print(" ");} bluetooth.println(" ");
+}  // close currentLoc
 
 ////////////////////////////////////////////////////////////////////////
 int checkForSwitchback(){
