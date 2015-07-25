@@ -98,13 +98,13 @@ int nodeType = 0;
 int IRwhite = 200;             // any IR value smaller than this is treated as white
 int IRblack = 600;             // any IR value larger than this is treated as black
 int turnSpeed = 110;           // running too fast sometimes results in missed IR scans as array sweeps too fast over a line
-int pivotSpeed = 100;          // ...or overshoots a target position
+int pivotSpeed = 150;          // ...or overshoots a target position
 int nodeCheckSpeed = 100;      // ...or advances farther than necessary for a second reading
 int nodeBump = 125;             // degrees of extra nudge forward after detecting a node to improve node-to-node measurements
 int pivotBump = 0;             // was uTurnBump, still needed?
 int nodeCheckDelay = 600;      // time to pause and allow bot to stop moving before evaluating a found node
 
-char heading = 'n';             // direction bot is heading. n, s, e, w (North, South, East, West)
+char headingCurrent = 'n';             // direction bot is facing. n, s, e, w (North, South, East, West)
 int reconMode = 0;             // maze recon mode 0 = on, 1 = off
 int locx = 0;                  // location on x axis
 int locy = 0;                  // location on y axis
@@ -125,6 +125,8 @@ float legPreviousInches = 0;
 
 int nodeLocCurrent[2] = {0, 0};
 int nodeLocPrevious[2] = {0, 0};
+
+int degreesToRotate = 0;
 
 ////////////////////////////////////////////////////////////////////////
 // Setup
@@ -170,7 +172,12 @@ void loop()
   //testNXTEncoders();
   //getDegrees();
   /////mazeSolverModeRHSPruning();    // bot acts like a maze solver using Right Hand Side algorithm with loop pruning
-  mazeSolverModeSolved();
+  //mazeSolverModeSolved();
+
+  pivot(90,0);
+  delay(5000);
+  pivot(180,1);
+  delay(5000);
   
   //currentLoc();
   //delay(1000);
@@ -929,15 +936,6 @@ int pivotRight(int speed){                         // robot rotates by pivoting 
 int pivotLeft(int speed){                         // robot rotates by pivoting in place (turning both wheels in opposite directions)
 
   bluetooth.println("pivot left");
-  
-  /*
-  // move straight forward a bit to improve node-to-node measurments...
-  // and provide more room to resume line following after completing the U-Turn manuever
-  pivotBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???)
-  Motor1.move(BACKWARD, nodeCheckSpeed, pivotBump, BRAKE);  // TODO move nodeBump to separate function since maze solver will use, but line follower may not
-  Motor2.move(BACKWARD, nodeCheckSpeed, pivotBump, BRAKE);
-  delay(nodeCheckDelay); // allow previous maneuver to complete
-  */
 
   // bot might be on a current line so get off the current line
   while (sensorValues[0] > IRblack || sensorValues[1] > IRblack || sensorValues[2] > IRblack || sensorValues[3] > IRblack || sensorValues[4] > IRblack || sensorValues[5] > IRblack){
@@ -958,6 +956,54 @@ int pivotLeft(int speed){                         // robot rotates by pivoting i
   }
 } // close pivotLeft function
 
+////////////////////////////////////////////////////////////////////////
+/// TODO probably don't need this function
+int pivot(int pivotDegrees, int pivotDirection){
+  allStop();
+  bluetooth.println("entering pivotDegrees function");
+  bluetooth.print("pivotDegrees ");
+  bluetooth.println(pivotDegrees);
+  bluetooth.print("pivotDirection ");
+  bluetooth.println(pivotDirection);  
+
+  // robot rotates by pivoting in place (turning both wheels in opposite directions)
+  // robot should rotate in place counter clockwise the specified number of degrees
+  //
+  // pivotDegrees is an integer between 0 and 360
+  // pivotDirection is either 0 (right) or 1 (left)
+  // 
+  // wheelbase on my bot is 3.5 inches from centerline of one wheel to the other.
+  // ...which means a rotating circumference of about 11 inches.
+  // ...my wheels have an 8 inch circumference, or 45 degrees per inch
+  // ...so both wheels will need to rotate (45 * 11) 495 degrees for the bot itself to pivot 360
+  // ...in theory.
+
+  // convert requested degrees to rotate into degrees of rotation needed by the motors
+
+  //degreesToRotate = map(pivotDegrees, 0, 360, 0, 495);
+  // reducing re-map a little to compensate for momentum but allow turns to be specified 
+  // at logical (to the user) values. Re-map value arrived at via trial-and-error
+  degreesToRotate = map(pivotDegrees, 0, 360, 0, 425);
+
+  bluetooth.print("remapped degreesToRotate ");
+  bluetooth.println(degreesToRotate);
+
+  if (pivotDirection == 0)
+  {
+    Motor1.move(BACKWARD, pivotSpeed, degreesToRotate, BRAKE);
+    Motor2.move(FORWARD, pivotSpeed, degreesToRotate, BRAKE);
+  }
+  if (pivotDirection == 1)
+  {
+    Motor1.move(FORWARD, pivotSpeed, degreesToRotate, BRAKE);
+    Motor2.move(BACKWARD, pivotSpeed, degreesToRotate, BRAKE);  
+  }
+  
+  delay(3000); // TODO remove this delay?
+ 
+} // close pivotLeft function
+
+
 int bump(){
   // Compensate for bot stopping when line detected.
   // We want to measure distances between node at a point beneath the rear axel / pivot point.
@@ -973,7 +1019,7 @@ int bump(){
 }
 
 ////////////////////////////////////////////////////////////////////////
-int updateHeading(int pivotType){
+int updateHeading(int pivotType){                      //  TODO probably won's use this approach/function
   // pivotType can be one of "right" "left" or "uTurn"
   switch (pivotType) {
     case 0:
@@ -1012,7 +1058,7 @@ int currentLoc(){
   bluetooth.print("legPreviousInches: ");
   bluetooth.println(legPreviousInches, 4);
   bluetooth.print("heading: ");
-  bluetooth.println(heading);
+  bluetooth.println(headingCurrent);
   
 }  // close currentLoc
 
