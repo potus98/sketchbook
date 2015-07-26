@@ -75,10 +75,10 @@ unsigned int sensorValuesB[NUM_SENSORS];  // second array use for doublecheck no
 // http://letsmakerobots.com/node/38550
 #define Kp .2 // experiment to determine this, start by something small that just makes your bot follow the line at a slow speed
 #define Kd .8 // experiment to determine this, slowly increase the speeds and adjust this value. ( Note: Kp < Kd) 
-#define rightMaxSpeed 190 // max speed of the robot
-#define leftMaxSpeed 190 // max speed of the robot
-#define rightBaseSpeed 170 // this is the speed at which the motors should spin when the robot is perfectly on the line
-#define leftBaseSpeed 170  // this is the speed at which the motors should spin when the robot is perfectly on the line
+#define rightMaxSpeed 170 // max speed of the robot
+#define leftMaxSpeed 170 // max speed of the robot
+#define rightBaseSpeed 150 // this is the speed at which the motors should spin when the robot is perfectly on the line
+#define leftBaseSpeed 150  // this is the speed at which the motors should spin when the robot is perfectly on the line
 int lastError = 0;
 
 ////////////////////////////////////////////////////////////////////////
@@ -97,10 +97,11 @@ int speedMotorB = 0;
 int nodeType = 0;
 int IRwhite = 200;             // any IR value smaller than this is treated as white
 int IRblack = 600;             // any IR value larger than this is treated as black
-int turnSpeed = 110;           // running too fast sometimes results in missed IR scans as array sweeps too fast over a line
-int pivotSpeed = 150;          // ...or overshoots a target position
+int turnSpeed = 100;           // running too fast sometimes results in missed IR scans as array sweeps too fast over a line
+int pivotSpeed = 100;          // ...or overshoots a target position
 int nodeCheckSpeed = 100;      // ...or advances farther than necessary for a second reading
-int nodeBump = 125;             // degrees of extra nudge forward after detecting a node to improve node-to-node measurements
+int nodeBump = 100;             // degrees of extra nudge forward after detecting a node to improve node-to-node measurements
+                               // 125 nodeBump was accurate for positioning rear axel over node for accurate node-to-node measurements
 int pivotBump = 0;             // was uTurnBump, still needed?
 int nodeCheckDelay = 600;      // time to pause and allow bot to stop moving before evaluating a found node
 
@@ -116,6 +117,9 @@ int rightDegreesPrevious = 0;
 int leftDegreesTraveled = 0;
 int rightDegreesTraveled = 0;
 int avgDegreesTraveled = 0;
+
+char mazeSolved [2] = {'R', 'R'};   // hardcoded test solution
+int mazeSolvedCursor = 0;
 
 
 
@@ -180,12 +184,10 @@ void loop()
   //testNXTEncoders();
   //getDegrees();
   /////mazeSolverModeRHSPruning();    // bot acts like a maze solver using Right Hand Side algorithm with loop pruning
-  //mazeSolverModeSolved();
-
 
   
-  //updateCurrentLoc();
-  //delay(1000);
+  mazeSolverModeSolved();
+
 
   // check for test run length
   TestRuns++;
@@ -541,7 +543,7 @@ int mazeSolverModeSolved(){      // bot uses this function to execute the best d
 
     case 1:                    // 1  - four way intersection (bot can turn left, right, or continue straight)
       // consult solution for which way to go
-      pivotLeft(pivotSpeed); 
+      pivotSolution();
       break;
             
     case 2:                    // 2  - black square (finish box for maze solving)
@@ -550,32 +552,38 @@ int mazeSolverModeSolved(){      // bot uses this function to execute the best d
     
     case 3:                    // 3  - dead end T intersection (bot can turn left or right)
       // consult solution for which way to go
-      pivotRight(pivotSpeed);
+      pivotSolution();
       break;
 
     
     case 4:                    // 4  - right hand T intersection (bot can turn right or continue straight)
       // consult solution for which way to go
-      pivotRight(pivotSpeed);
+      pivotSolution();
       break;
     
     case 5:                    // 5  - left hand T intersection (bot can turn left or continue straight)
-      // consult solution for which way to go
+      pivotSolution();
       break;
     
     case 6:                    // 6  - dead end line (bot must stop or complete a U-turn)
       // I should never see this when performing my solved run
+      // TODO abandon solution and revert to RHS mode
+      bump();
       pivotRight(pivotSpeed);
       break;
       
     case 9:                    // 9  - 90 degree right turn (bot can only turn right) need to identify such nodes for building a coordinate grid of a maze
       // Nothing special, just keep going
+      bump();
       pivotRight(pivotSpeed);
       break;
     
     case 10:                   // 10 - 90 degree left turn (bot can only turn left) need to identify such nodes for building a coordinate grid of a maze
       // nothing special, just keep going
+      bluetooth.println("entering case 10, calling turnLeft");
+      bump();
       pivotLeft(pivotSpeed);
+      bluetooth.println("done turning left");
       break;
     
     default:
@@ -586,7 +594,7 @@ int mazeSolverModeSolved(){      // bot uses this function to execute the best d
   
   followLine();
   
-} // close mazeSolverModeRHSPruning
+} // close mazeSolverModeSolved
 
 
 
@@ -710,14 +718,14 @@ int checkForNode(){
 
     // check for all white
     if (sensorValuesB[0] < IRwhite && sensorValuesB[1] < IRwhite && sensorValuesB[2] < IRwhite && sensorValuesB[3] < IRwhite && sensorValuesB[4] < IRwhite && sensorValuesB[5] < IRwhite && sensorValuesB[6] < IRwhite && sensorValuesB[7] < IRwhite){      
-      //Serial3.println("ret 9");
+      bluetooth.println("ret 9");
       return 9;
     }
     
     // check for 3 way intersection (bot can turn right, or continue straight)
     if ((sensorValuesB[0] < IRwhite && sensorValuesB[7] < IRwhite) && (sensorValuesB[3] > IRblack || sensorValuesB[4] > IRblack)){
       // outer sensors see white and at least one of the middle sensors sees black        
-      //Serial3.println("ret 4");
+      bluetooth.println("ret 4");
       return 4;
     }
   }  // close check for node 9 and 4
@@ -732,14 +740,14 @@ int checkForNode(){
     
     // check for all white
     if (sensorValuesB[0] < IRwhite && sensorValuesB[1] < IRwhite && sensorValuesB[2] < IRwhite && sensorValuesB[3] < IRwhite && sensorValuesB[4] < IRwhite && sensorValuesB[5] < IRwhite && sensorValuesB[6] < IRwhite && sensorValuesB[7] < IRwhite){
-      //Serial3.println("ret 10");
+      bluetooth.println("ret 10");
       return 10;
     }
     
     // check for 3 way intersection (bot can turn left, or continue straight)
     if ((sensorValuesB[0] < IRwhite && sensorValuesB[7] < IRwhite) && (sensorValuesB[3] > IRblack || sensorValuesB[4] > IRblack)){
       // outer sensors see white and at least one of the middle sensors sees black
-      //Serial3.println("ret 5");
+      bluetooth.println("ret 5");
       return 5;
     }
   }  // close check for node 10 and 5
@@ -761,9 +769,11 @@ int checkForNode(){
 
 ////////////////////////////////////////////////////////////////////////
 int turnRight(int speed){
-  //Serial3.println("Entering turnRight function");
+  bluetooth.println("Entering turnRight function");
   // robot turns right by pivoting on the right wheel (only running left wheel)
 
+  qtra.readLine(sensorValues);
+  
   // bot might be on a current line so get off the current line
   while (sensorValues[4] > IRblack || sensorValues[5] > IRblack || sensorValues[6] > IRblack || sensorValues[7] > IRblack){
     Motor1.move(BACKWARD, speed);
@@ -782,15 +792,19 @@ int turnRight(int speed){
 
 ////////////////////////////////////////////////////////////////////////
 int turnLeft(int speed){               // robot turns left by pivoting on the left wheel (only running right wheel)
-  //Serial3.println("Entering turnLeft function");
+  bluetooth.println("entering turnLeft function");
   // robot turns left by pivoting on the left wheel (only running right wheel)
+  
+  qtra.readLine(sensorValues);
 
   // bot might be on a current line so get off the current line
-  while (sensorValues[0] > IRblack || sensorValues[1] > IRblack || sensorValues[2] > IRblack || sensorValues[3] > IRblack){
+  //while (sensorValues[0] > IRblack || sensorValues[1] > IRblack || sensorValues[2] > IRblack || sensorValues[3] > IRblack){
+  while (sensorValues[0] > IRblack || sensorValues[1] > IRblack || sensorValues[2] > IRblack || sensorValues[3] > IRblack || sensorValues[4] > IRblack || sensorValues[5] > IRblack){
     Motor2.move(BACKWARD, speed);
     qtra.readLine(sensorValues);
     delay(10);  // give a chance for sensors to finish reading
   }
+  bluetooth.println("cleard line (if any)");
   
   // ...then keep turning left while all sensors see white until a line is detected
   while (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
@@ -798,19 +812,24 @@ int turnLeft(int speed){               // robot turns left by pivoting on the le
     qtra.readLine(sensorValues);
     delay(10);  // give a chance for sensors to finish reading
   }
+  bluetooth.println("presumeably found destination line");
 } // close turnLeft function
 
 
 ////////////////////////////////////////////////////////////////////////
 int pivotRight(int speed){                         // robot rotates by pivoting in place (turning both wheels in opposite directions)
 
-  //Serial3.println("pivot right");
   bluetooth.println("pivot right");
+
+  qtra.readLine(sensorValues);
+  
+  /*
   // move straight forward a bit to provide more room to resume line following after completing the U-Turn manuever
   pivotBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???) TODO remove this?
   Motor1.move(BACKWARD, nodeCheckSpeed, pivotBump, BRAKE);  // TODO move nodeBump to separate function since maze solver will use, but line follower may not
   Motor2.move(BACKWARD, nodeCheckSpeed, pivotBump, BRAKE);
   delay(nodeCheckDelay); // allow previous maneuver to complete
+  */
 
   // bot might be on a current line so get off the current line
   while (sensorValues[2] > IRblack || sensorValues[3] > IRblack || sensorValues[4] > IRblack || sensorValues[5] > IRblack || sensorValues[6] > IRblack || sensorValues[7] > IRblack){
@@ -823,7 +842,7 @@ int pivotRight(int speed){                         // robot rotates by pivoting 
   // continue rotating until line reached
   //while (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
   //while (sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite){
-  while (IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite){
+  while (IRwhite && sensorValues[2] < IRwhite && IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite){
     Motor1.move(BACKWARD, speed);
     Motor2.move(FORWARD, speed);
     qtra.readLine(sensorValues);
@@ -836,6 +855,8 @@ int pivotLeft(int speed){                         // robot rotates by pivoting i
 
   bluetooth.println("pivot left");
 
+  qtra.readLine(sensorValues);
+
   // bot might be on a current line so get off the current line
   while (sensorValues[0] > IRblack || sensorValues[1] > IRblack || sensorValues[2] > IRblack || sensorValues[3] > IRblack || sensorValues[4] > IRblack || sensorValues[5] > IRblack){
     Motor1.move(FORWARD, speed);
@@ -847,7 +868,7 @@ int pivotLeft(int speed){                         // robot rotates by pivoting i
   // continue rotating until line reached
   //while (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){
   //while (sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite){
-  while (sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite){
+  while (sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite){
     Motor1.move(FORWARD, speed);
     Motor2.move(BACKWARD, speed);
     qtra.readLine(sensorValues);
@@ -856,6 +877,36 @@ int pivotLeft(int speed){                         // robot rotates by pivoting i
 } // close pivotLeft function
 
 
+////////////////////////////////////////////////////////////////////////
+int pivotSolution(){
+    bluetooth.println("entering pivotSolution function");
+    
+    switch (mazeSolved [mazeSolvedCursor]) {
+      
+    case 'R':
+      bluetooth.println("case was R");
+      bump();
+      pivotRight(pivotSpeed);
+      mazeSolvedCursor++;
+    break;
+
+    case 'L':
+      bluetooth.println("case was L");
+      bump();
+      pivotLeft(pivotSpeed);
+      mazeSolvedCursor++;
+    break;
+
+    case 'S':
+      bluetooth.println("case was S");
+      mazeSolvedCursor++;
+      //just keep going
+    break;
+
+    default:
+    break;
+  }  // close case statement
+} // close pivotSolution function
 
 
 ////////////////////////////////////////////////////////////////////////
