@@ -117,16 +117,23 @@ int leftDegreesTraveled = 0;
 int rightDegreesTraveled = 0;
 int avgDegreesTraveled = 0;
 
+
+
+/* deprecated variables probably not going to be used
 float inches = 0;
 int wheelCirc = 8;   // wheel circumference in inches
-
 float legPreviousDegrees = 0;
 float legPreviousInches = 0;
-
-int nodeLocCurrent[2] = {0, 0};
-int nodeLocPrevious[2] = {0, 0};
-
+int nodeLocCurrent[2] = {0, 1};
+int nodeLocPrevious[2] = {0, 1};
 int degreesToRotate = 0;
+char nodeArraySolved [3] [4] = {
+  {'S', 'W', 'S', 'S'},
+  {'S', 'U', 'E', 'S'},
+  {'E', 'E', 'N', 'F'}
+};
+*/
+
 
 ////////////////////////////////////////////////////////////////////////
 // Setup
@@ -137,7 +144,7 @@ void setup()
                                 // seems to only support 9600 baud rate (??), 19200 is garbled, 115200 is nothing
                                  // TODO baud rates supported by Mega 2560?
   
-  Serial.begin(9600);
+  Serial.begin(115200);
   bluetooth.begin(115200);
   delay(320);
   bluetooth.print("$");
@@ -157,6 +164,7 @@ void setup()
 // Main loop
 void loop()
 {
+  
   if (TestRuns == 0){
     delay(3000);
     calibrateIRarray();
@@ -174,12 +182,9 @@ void loop()
   /////mazeSolverModeRHSPruning();    // bot acts like a maze solver using Right Hand Side algorithm with loop pruning
   //mazeSolverModeSolved();
 
-  pivot(90,0);
-  delay(5000);
-  pivot(180,1);
-  delay(5000);
+
   
-  //currentLoc();
+  //updateCurrentLoc();
   //delay(1000);
 
   // check for test run length
@@ -469,6 +474,7 @@ int mazeSolverModeRHS(){      // bot acts like a maze solver using Right Hand Si
   } // close switch statement
 } // close mazeSolverModeRHS
 
+
 ////////////////////////////////////////////////////////////////////////
 int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right Hand Side algorithm with loop pruning
   
@@ -480,11 +486,7 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
       break;
 
     case 1:                   // 1  - four way intersection (bot can turn left, right, or continue straight)
-      getDegrees();          //      obtain distance reading from previous node
-      //turnRight(turnSpeed);
       pivotRight(pivotSpeed);
-      updateHeading(0); //      assuming all lines are 90 degrees
-      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
     case 2:                   // 2  - black square (finish box for maze solving)
@@ -492,62 +494,28 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
       break;
     
     case 3:                   // 3  - dead end T intersection (bot can turn left or right)
-      getDegrees();          //      obtain distance reading from previous node
-      //turnRight(turnSpeed);
       pivotRight(pivotSpeed);
-      updateHeading(0);
-      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
 
     
     case 4:                   // 4  - right hand T intersection (bot can turn right or continue straight)
-      getDegrees();          //      obtain distance reading from previous node
-      //turnRight(turnSpeed);
       pivotRight(pivotSpeed);
-      updateHeading(0);
-      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
     case 5:                   // 5  - left hand T intersection (bot can turn left or continue straight)
-      getDegrees();          //      obtain distance reading from previous node
       // RHS so just go straight
       break;
     
     case 6:                   // 6  - dead end line (bot must stop or complete a U-turn)
-      getDegrees();          //      obtain distance reading from previous node
       pivotRight(pivotSpeed);
-      updateHeading(2);
-      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
       
     case 9:                   // 9  - 90 degree right turn (bot can only turn right) need to identify such nodes for building a coordinate grid of a maze
-      getDegrees();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
-      //turnRight(turnSpeed);
       pivotRight(pivotSpeed);
-      updateHeading(0);
-      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
     case 10:                  // 10 - 90 degree left turn (bot can only turn left) need to identify such nodes for building a coordinate grid of a maze
-      //getDegrees();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
-      //turnLeft(turnSpeed);
-
-      pause();
-      
-      /*             FIX this back to basic RHS
-      bump();
-      delay(250);
-      legPreviousInches = degreesToInches(getDegrees());          //  distance measured at this point 
-      bluetooth.print("Distance of previous leg: ");
-      bluetooth.print(legPreviousInches);
-      bluetooth.println(" inches");
-      delay(5000);
-      pivotLeft(pivotSpeed);
-      delay(3000);
-      
-      updateHeading(1);
-      getDegrees();  // reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
-      */
+      pivotLeft(turnSpeed);
       break;
     
     default:
@@ -562,78 +530,52 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
 
 
 ////////////////////////////////////////////////////////////////////////
-int mazeSolverModeSolved(){      // bot acts like a maze solver using Right Hand Side algorithm with loop pruning
+int mazeSolverModeSolved(){      // bot uses this function to execute the best derived maze solution
   
   nodeType = checkForNode();
 
   switch (nodeType) {
-    case 0:                   // 0  - no node detected
+    case 0:                    // 0  - no node detected
       //followLine();
       break;
 
-    case 1:                   // 1  - four way intersection (bot can turn left, right, or continue straight)
-      getDegrees();          //      obtain distance reading from previous node
-      //turnRight(turnSpeed);
-      pivotRight(pivotSpeed);
-      updateHeading(0); //      assuming all lines are 90 degrees
-      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
+    case 1:                    // 1  - four way intersection (bot can turn left, right, or continue straight)
+      // consult solution for which way to go
+      pivotLeft(pivotSpeed); 
       break;
-    
-    case 2:                   // 2  - black square (finish box for maze solving)
+            
+    case 2:                    // 2  - black square (finish box for maze solving)
       pause();
       break;
     
-    case 3:                   // 3  - dead end T intersection (bot can turn left or right)
-      getDegrees();          //      obtain distance reading from previous node
-      //turnRight(turnSpeed);
+    case 3:                    // 3  - dead end T intersection (bot can turn left or right)
+      // consult solution for which way to go
       pivotRight(pivotSpeed);
-      updateHeading(0);
-      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
 
     
-    case 4:                   // 4  - right hand T intersection (bot can turn right or continue straight)
-      getDegrees();          //      obtain distance reading from previous node
-      //turnRight(turnSpeed);
+    case 4:                    // 4  - right hand T intersection (bot can turn right or continue straight)
+      // consult solution for which way to go
       pivotRight(pivotSpeed);
-      updateHeading(0);
-      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
-    case 5:                   // 5  - left hand T intersection (bot can turn left or continue straight)
-      getDegrees();          //      obtain distance reading from previous node
-      // RHS so just go straight
+    case 5:                    // 5  - left hand T intersection (bot can turn left or continue straight)
+      // consult solution for which way to go
       break;
     
-    case 6:                   // 6  - dead end line (bot must stop or complete a U-turn)
-      getDegrees();          //      obtain distance reading from previous node
+    case 6:                    // 6  - dead end line (bot must stop or complete a U-turn)
+      // I should never see this when performing my solved run
       pivotRight(pivotSpeed);
-      updateHeading(2);
-      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
       
-    case 9:                   // 9  - 90 degree right turn (bot can only turn right) need to identify such nodes for building a coordinate grid of a maze
-      getDegrees();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
-      //turnRight(turnSpeed);
+    case 9:                    // 9  - 90 degree right turn (bot can only turn right) need to identify such nodes for building a coordinate grid of a maze
+      // Nothing special, just keep going
       pivotRight(pivotSpeed);
-      updateHeading(0);
-      getDegrees();          //      reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
-    case 10:                  // 10 - 90 degree left turn (bot can only turn left) need to identify such nodes for building a coordinate grid of a maze
-      
-      //turnLeft(turnSpeed);
-      bump();
-      delay(250);
-      legPreviousInches = degreesToInches(getDegrees());          //  distance measured at this point 
-      currentLoc();
-      delay(5000);
+    case 10:                   // 10 - 90 degree left turn (bot can only turn left) need to identify such nodes for building a coordinate grid of a maze
+      // nothing special, just keep going
       pivotLeft(pivotSpeed);
-      getDegrees();          //      obtain distance reading prior to resuming (negate encoder tics accumulated during the turning process
-      delay(3000);
-      
-      updateHeading(1);
-      getDegrees();  // reset measurements for distance measurement to next node (negate the encoder tics accumulated during the turning process)
       break;
     
     default:
@@ -650,53 +592,10 @@ int mazeSolverModeSolved(){      // bot acts like a maze solver using Right Hand
 
 ////////////////////////////////////////////////////////////////////////
 int mazeSolverModeLHS(){      // bot acts like a maze solver using Left Hand Side algorithm
-                              // TODO fix this function since turns removed from checkForNode()
-  nodeType = checkForNode();
 
-  switch (nodeType) {
-    case 0:                   // 0  - no node detected
-      followLine();
-      break;
-
-    case 1:                   // 1  - four way intersection (bot can turn left, right, or continue straight)
-      turnLeft(turnSpeed);         //      100 motor speed (130 seemed to be too fast for IR sensors to catch the line)
-      break;                  //      270 degrees of rotation (6 inches of wheel travel) would be
-                              //      theoretically ideal 90 degree right turn, but reduced to 250 due to extra wheel momentum
-    
-    case 2:                   // 2  - black square (finish box for maze solving)
-      pause();
-      break;
-    
-    case 3:                   // 3  - dead end T intersection (bot can turn left or right)
-      turnLeft(turnSpeed);         //      100 motor speed (130 seemed to be too fast for IR sensors to catch the line)
-      break;                  //      270 degrees of rotation (6 inches of wheel travel) would be
-                              //      theoretically ideal, but reduced here due to extra wheel momentum
-    
-    case 4:                   // 4  - right hand T intersection (bot can turn right or continue straight)
-      followLine();
-      break;
-    
-    case 5:                   // 5  - left hand T intersection (bot can turn left or continue straight)
-      turnLeft(turnSpeed);
-      break;
-    
-    case 6:                   // 6  - dead end line (bot must stop or complete a U-turn)
-      followLine();           //      bot has already turned by this point
-      break;
-      
-    case 9:                   // 9  - 90 degree right turn (bot can only turn right) need to identify such nodes for building a coordinate grid of a maze
-      followLine();           //      bot has already turned by this point
-      break;
-    
-    case 10:                  // 10 - 90 degree left turn (bot can only turn left) need to identify such nodes for building a coordinate grid of a maze
-      followLine();           //      bot has already turned by this point
-      break;
-    
-    default:
-      followLine();
-    
-  } // close switch statement
-} // close mazeSolverModeRHS
+  // complete LHS after RHS is completed and tested.
+   
+} // close mazeSolverModeLHS
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -956,6 +855,99 @@ int pivotLeft(int speed){                         // robot rotates by pivoting i
   }
 } // close pivotLeft function
 
+
+
+
+////////////////////////////////////////////////////////////////////////
+int bump(){
+  // Compensate for bot stopping when line detected.
+  // We want to measure distances between node at a point beneath the rear axel / pivot point.
+  // But the bot stops immedately upon detecting a line (which is good).
+  // This bump is intended to nudge the robot forward so the node is directly beneath the rear axel.
+  
+  // move straight forward a bit to improve node-to-node measurments...
+  // and provide more room to resume line following after completing the U-Turn manuever
+  //pivotBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???)
+  Motor1.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);  // TODO move nodeBump to separate function since maze solver will use, but line follower may not
+  Motor2.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);
+  delay(nodeCheckDelay); // allow previous maneuver to complete
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////
+int checkForSwitchback(){
+  // 
+}
+
+////////////////////////////////////////////////////////////////////////
+int checkForEdge(){
+  // check for edge of table
+}
+
+
+
+////////////////////////////////////////////////////////////////////////
+//
+//  Deprecated functions currently not planning to use
+//
+////////////////////////////////////////////////////////////////////////
+
+/*
+
+////////////////////////////////////////////////////////////////////////
+int updateHeading(int pivotType){                      //  TODO probably won's use this approach/function
+  // pivotType can be one of "right" "left" or "uTurn"
+  switch (pivotType) {
+    case 0:
+      bluetooth.println("change heading right");
+      delay(10);
+      break;
+
+    case 1:
+      bluetooth.println("change heading left");
+      delay(10);
+      break;
+
+    case 2:
+      bluetooth.println("change heading uTurn");
+      delay(10);
+      break;
+  }
+}  // close updateHeading function
+
+////////////////////////////////////////////////////////////////////////
+float degreesToInches(int degrees){
+  bluetooth.print("degrees coming into degreesToInches: ");
+  bluetooth.println(degrees);
+  bluetooth.print("wheelCirc: ");
+  bluetooth.println(wheelCirc);
+  // convert wheel encoder tics to inches based on 8 inch circumference wheel
+  inches = (degrees / 360.0) * wheelCirc;
+  bluetooth.print("inches: ");
+  bluetooth.println(inches);
+  return inches;
+}  // close degreesToInches
+
+
+////////////////////////////////////////////////////////////////////////
+int updateCurrentLoc(){
+  bluetooth.println("entering updateCurrentLoc function");
+  bluetooth.print("nodeLocPrevious ");
+  int i; for (i = 0; i < 2; i++) { bluetooth.print(nodeLocPrevious[i]);bluetooth.print(" ");} bluetooth.println(" ");
+  bluetooth.print("legPreviousInches: ");
+  bluetooth.println(legPreviousInches, 4);   // print legPreviousInches, but limit float to 4 decimal places
+  bluetooth.print("heading: ");
+
+  // TODO determine which node I'm at using quadratic equation
+  
+  bluetooth.println(headingCurrent);
+  bluetooth.print("nodeLocCurrent: ");'
+  int i; for (i = 0; i < 2; i++) { bluetooth.print(nodeLocCurrent[i]);bluetooth.print(" ");} bluetooth.println(" ");
+}  // close updateCurrentLoc
+
+
 ////////////////////////////////////////////////////////////////////////
 /// TODO probably don't need this function
 int pivot(int pivotDegrees, int pivotDirection){
@@ -1004,73 +996,5 @@ int pivot(int pivotDegrees, int pivotDirection){
 } // close pivotLeft function
 
 
-int bump(){
-  // Compensate for bot stopping when line detected.
-  // We want to measure distances between node at a point beneath the rear axel / pivot point.
-  // But the bot stops immedately upon detecting a line (which is good).
-  // This bump is intended to nudge the robot forward so the node is directly beneath the rear axel.
-  
-  // move straight forward a bit to improve node-to-node measurments...
-  // and provide more room to resume line following after completing the U-Turn manuever
-  //pivotBump = (nodeBump - 20); // seems bot runs a little farther while evaluating if statements above before reaching this point (???)
-  Motor1.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);  // TODO move nodeBump to separate function since maze solver will use, but line follower may not
-  Motor2.move(BACKWARD, nodeCheckSpeed, nodeBump, BRAKE);
-  delay(nodeCheckDelay); // allow previous maneuver to complete
-}
-
-////////////////////////////////////////////////////////////////////////
-int updateHeading(int pivotType){                      //  TODO probably won's use this approach/function
-  // pivotType can be one of "right" "left" or "uTurn"
-  switch (pivotType) {
-    case 0:
-      bluetooth.println("change heading right");
-      delay(10);
-      break;
-
-    case 1:
-      bluetooth.println("change heading left");
-      delay(10);
-      break;
-
-    case 2:
-      bluetooth.println("change heading uTurn");
-      delay(10);
-      break;
-  }
-}  // close updateHeading function
-
-float degreesToInches(int degrees){
-  bluetooth.print("degrees coming into degreesToInches: ");
-  bluetooth.println(degrees);
-  bluetooth.print("wheelCirc: ");
-  bluetooth.println(wheelCirc);
-  // convert wheel encoder tics to inches based on 8 inch circumference wheel
-  inches = (degrees / 360.0) * wheelCirc;
-  bluetooth.print("inches: ");
-  bluetooth.println(inches);
-  return inches;
-}  // close degreesToInches
-
-int currentLoc(){
-  bluetooth.println("entering currentLoc function");
-  bluetooth.print("nodeLocPrevious ");
-  int i; for (i = 0; i < 2; i++) { bluetooth.print(nodeLocPrevious[i]);bluetooth.print(" ");} bluetooth.println(" ");
-  bluetooth.print("legPreviousInches: ");
-  bluetooth.println(legPreviousInches, 4);
-  bluetooth.print("heading: ");
-  bluetooth.println(headingCurrent);
-  
-}  // close currentLoc
-
-////////////////////////////////////////////////////////////////////////
-int checkForSwitchback(){
-  // 
-}
-
-////////////////////////////////////////////////////////////////////////
-int checkForEdge(){
-  // check for edge of table
-}
-
-
+*/
 
