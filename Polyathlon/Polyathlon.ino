@@ -33,13 +33,10 @@
 ////////////////////////////////////////////////////////////////////////
 //
 // TODO
-// variablize turning speed
-// tighten turns when encountering a 90 degree turn (currently swings a little too wide)
 // PD tuning for tighter following on center
 // increase max speeds
 // remove four way intersection pause
-// add 5 second delay start button
-// implement global #define debugprint Serial.print
+// implement global #define debugprint bluetooth.print
 
 ////////////////////////////////////////////////////////////////////////
 // Prepare NXTShield
@@ -563,7 +560,7 @@ int mazeSolverModeLHSPruning(){      // bot uses Left Hand Side algorithm to map
       break;
     
     case 4:                   // 4  - right hand T intersection (bot can turn right or continue straight)
-      updatePath('S');   // update path that I went straight
+      updatePath('S');   // update path that I went straight  
       // LHS algorithm, so go keep going straight
       break;
     
@@ -575,15 +572,16 @@ int mazeSolverModeLHSPruning(){      // bot uses Left Hand Side algorithm to map
     
     case 6:                   // 6  - dead end line (bot must stop or complete a U-turn)
       updatePath('U');   // update path with this left turn
+      bump();             // bumping out on a uTurn provides more PD recovery room when resuming
       pivotRight(pivotSpeed);
       break;
       
-    case 9:                   // 9  - 90 degree right turn (bot can only turn right) need to identify such nodes for building a coordinate grid of a maze
+    case 9:                   // 9  - 90 degree right turn (bot can only turn right)
       bump();
       pivotRight(pivotSpeed);
       break;
     
-    case 10:                  // 10 - 90 degree left turn (bot can only turn left) need to identify such nodes for building a coordinate grid of a maze
+    case 10:                  // 10 - 90 degree left turn (bot can only turn left)
       bump();
       pivotLeft(turnSpeed);
       break;
@@ -999,9 +997,31 @@ char updatePath(char currentTurn){
     bluetooth.println("found an SUL in this array:");
     int i; for (i = 0; i < (mazePathSolvedCursor); i++) { bluetooth.print(mazePathLHSWIP[i]);bluetooth.print(" ");} bluetooth.println(" ");
     mazePathLHSWIP[mazePathSolvedCursor - 2] = 'R';
+    mazePathLHSWIP[mazePathSolvedCursor - 1] = 'X';
+    mazePathLHSWIP[mazePathSolvedCursor] = 'X';
     mazePathSolvedCursor = mazePathSolvedCursor - 2;
   }
-  
+
+  // check for LUL and change it to S
+  if (mazePathLHSWIP[mazePathSolvedCursor - 2] == 'L' && mazePathLHSWIP[mazePathSolvedCursor - 1] == 'U' && mazePathLHSWIP[mazePathSolvedCursor] == 'L'){
+    bluetooth.println("found an LUL in this array:");
+    int i; for (i = 0; i < (mazePathSolvedCursor); i++) { bluetooth.print(mazePathLHSWIP[i]);bluetooth.print(" ");} bluetooth.println(" ");
+    mazePathLHSWIP[mazePathSolvedCursor - 2] = 'S';
+    mazePathLHSWIP[mazePathSolvedCursor - 1] = 'X';
+    mazePathLHSWIP[mazePathSolvedCursor] = 'X';
+    mazePathSolvedCursor = mazePathSolvedCursor - 2;
+  }
+
+  // check for LUS and change it to R
+  if (mazePathLHSWIP[mazePathSolvedCursor - 2] == 'L' && mazePathLHSWIP[mazePathSolvedCursor - 1] == 'U' && mazePathLHSWIP[mazePathSolvedCursor] == 'S'){
+    bluetooth.println("found an LUS in this array:");
+    int i; for (i = 0; i < (mazePathSolvedCursor); i++) { bluetooth.print(mazePathLHSWIP[i]);bluetooth.print(" ");} bluetooth.println(" ");
+    mazePathLHSWIP[mazePathSolvedCursor - 2] = 'R';
+    mazePathLHSWIP[mazePathSolvedCursor - 1] = 'X';
+    mazePathLHSWIP[mazePathSolvedCursor] = 'X';
+    mazePathSolvedCursor = mazePathSolvedCursor - 2;
+  }
+
   mazePathSolvedCursor++;
   
   bluetooth.print("mazePathLHSWIP is now: ");
