@@ -121,9 +121,9 @@ int avgDegreesTraveled = 0;
 char mazeSolved [2] = {'R', 'R'};   // hardcoded test solution
 int mazeSolvedCursor = 0;
 
-char mazePathLHSWIP [10] = {'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L'};
-char mazePathRHSWIP [10] = {'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'};
-char mazePathSolved [10] = {'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L'};
+char mazePathLHSWIP [10] = {'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'};
+char mazePathRHSWIP [10] = {'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'};
+char mazePathSolved [10] = {'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'};
 int mazePathSolvedCursor = 0;
 
 /* deprecated variables probably not going to be used
@@ -574,6 +574,7 @@ int mazeSolverModeLHSPruning(){      // bot uses Left Hand Side algorithm to map
       break;
     
     case 6:                   // 6  - dead end line (bot must stop or complete a U-turn)
+      updatePath('U');   // update path with this left turn
       pivotRight(pivotSpeed);
       break;
       
@@ -751,20 +752,20 @@ int checkForNode(){
     
     if ((sensorValuesB[0] < IRwhite && sensorValuesB[7] < IRwhite) && (sensorValuesB[3] > IRblack || sensorValuesB[4] > IRblack)){
       // outer sensors see white and at least one of the middle sensors sees black
-        //Serial3.println("ret 1");
+        bluetooth.println("ret 1");
         return 1;  
     }
     
     if (sensorValuesB[2] > IRblack && sensorValuesB[3] > IRblack && sensorValuesB[4] > IRblack && sensorValuesB[5] > IRblack) // reduced to middle four sensors
     {      
       reconMode = 1;
-      //Serial3.println("ret 2");
+      bluetooth.println("ret 2");
       return 2;
     }
 
     if (sensorValuesB[0] < IRwhite && sensorValuesB[1] < IRwhite && sensorValuesB[2] < IRwhite && sensorValuesB[3] < IRwhite && sensorValuesB[4] < IRwhite && sensorValuesB[5] < IRwhite && sensorValuesB[6] < IRwhite && sensorValuesB[7] < IRwhite)
     {
-      //Serial3.println("ret 3");
+      bluetooth.println("ret 3");
       return 3;
     }
   } //end of check for intersections 1, 2, and 3
@@ -819,7 +820,7 @@ int checkForNode(){
   if (sensorValues[0] < IRwhite && sensorValues[1] < IRwhite && sensorValues[2] < IRwhite && sensorValues[3] < IRwhite && sensorValues[4] < IRwhite && sensorValues[5] < IRwhite && sensorValues[6] < IRwhite && sensorValues[7] < IRwhite){    
     allStop();
     delay(nodeCheckDelay);  // give bot a moment to come to a stop before taking a second reading
-    //Serial3.println("ret 6");
+    bluetooth.println("ret 6");
     return 6;
   }
 
@@ -985,11 +986,27 @@ int bump(){
   delay(nodeCheckDelay); // allow previous maneuver to complete
 }
 
-
+////////////////////////////////////////////////////////////////////////
 char updatePath(char currentTurn){
-  bluetooth.print("entering updatePath function with arg: ");
+  bluetooth.print("entering updatePath function with arg currentTurn of: ");
   bluetooth.println(currentTurn);
+  
   // append currentTurn to route
+  mazePathLHSWIP [mazePathSolvedCursor] = currentTurn;
+
+  // check for SUL and change it to R
+  if (mazePathLHSWIP[mazePathSolvedCursor - 2] == 'S' && mazePathLHSWIP[mazePathSolvedCursor - 1] == 'U' && mazePathLHSWIP[mazePathSolvedCursor] == 'L'){
+    bluetooth.println("found an SUL in this array:");
+    int i; for (i = 0; i < (mazePathSolvedCursor); i++) { bluetooth.print(mazePathLHSWIP[i]);bluetooth.print(" ");} bluetooth.println(" ");
+    mazePathLHSWIP[mazePathSolvedCursor - 2] = 'R';
+    mazePathSolvedCursor = mazePathSolvedCursor - 2;
+  }
+  
+  mazePathSolvedCursor++;
+  
+  bluetooth.print("mazePathLHSWIP is now: ");
+  int i; for (i = 0; i < (mazePathSolvedCursor); i++) { bluetooth.print(mazePathLHSWIP[i]);bluetooth.print(" ");} bluetooth.println(" ");  
+  
   // check for SUL and change it to R
   // check for LUL and change it to S
   // check for LUS and change it to R
