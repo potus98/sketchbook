@@ -121,7 +121,10 @@ int avgDegreesTraveled = 0;
 char mazeSolved [2] = {'R', 'R'};   // hardcoded test solution
 int mazeSolvedCursor = 0;
 
-
+char mazePathLHSWIP [10] = {'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L'};
+char mazePathRHSWIP [10] = {'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'};
+char mazePathSolved [10] = {'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L'};
+int mazePathSolvedCursor = 0;
 
 /* deprecated variables probably not going to be used
 float inches = 0;
@@ -185,8 +188,10 @@ void loop()
   //getDegrees();
   /////mazeSolverModeRHSPruning();    // bot acts like a maze solver using Right Hand Side algorithm with loop pruning
 
+  mazeSolverModeLHSPruning();
+
   
-  mazeSolverModeSolved();
+  //mazeSolverModeSolved();
 
 
   // check for test run length
@@ -532,6 +537,70 @@ int mazeSolverModeRHSPruning(){      // bot acts like a maze solver using Right 
 
 
 ////////////////////////////////////////////////////////////////////////
+int mazeSolverModeLHSPruning(){      // bot uses Left Hand Side algorithm to map course
+
+  nodeType = checkForNode();
+
+  switch (nodeType) {
+    case 0:                   // 0  - no node detected
+      //followLine();
+      break;
+
+    case 1:                   // 1  - four way intersection (bot can turn left, right, or continue straight)
+      updatePath('L');   // update path with this left turn     
+      bump();
+      pivotLeft(pivotSpeed);
+      break;
+    
+    case 2:                   // 2  - black square (finish box for maze solving)
+      pause();
+      break;
+    
+    case 3:                   // 3  - dead end T intersection (bot can turn left or right)
+      updatePath('L');   // update path with this left turn
+      bump();
+      pivotLeft(pivotSpeed);
+      break;
+    
+    case 4:                   // 4  - right hand T intersection (bot can turn right or continue straight)
+      updatePath('S');   // update path that I went straight
+      // LHS algorithm, so go keep going straight
+      break;
+    
+    case 5:                   // 5  - left hand T intersection (bot can turn left or continue straight)
+      updatePath('L');   // update path with this left turn
+      bump();
+      pivotLeft(pivotSpeed);
+      break;
+    
+    case 6:                   // 6  - dead end line (bot must stop or complete a U-turn)
+      pivotRight(pivotSpeed);
+      break;
+      
+    case 9:                   // 9  - 90 degree right turn (bot can only turn right) need to identify such nodes for building a coordinate grid of a maze
+      bump();
+      pivotRight(pivotSpeed);
+      break;
+    
+    case 10:                  // 10 - 90 degree left turn (bot can only turn left) need to identify such nodes for building a coordinate grid of a maze
+      bump();
+      pivotLeft(turnSpeed);
+      break;
+    
+    default:
+      //followLine();
+      break;
+    
+  } // close switch statement
+  
+  followLine();
+   
+} // close mazeSolverModeLHS
+
+
+
+
+////////////////////////////////////////////////////////////////////////
 int mazeSolverModeSolved(){      // bot uses this function to execute the best derived maze solution
   
   nodeType = checkForNode();
@@ -596,14 +665,6 @@ int mazeSolverModeSolved(){      // bot uses this function to execute the best d
   
 } // close mazeSolverModeSolved
 
-
-
-////////////////////////////////////////////////////////////////////////
-int mazeSolverModeLHS(){      // bot acts like a maze solver using Left Hand Side algorithm
-
-  // complete LHS after RHS is completed and tested.
-   
-} // close mazeSolverModeLHS
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -925,6 +986,14 @@ int bump(){
 }
 
 
+char updatePath(char currentTurn){
+  bluetooth.print("entering updatePath function with arg: ");
+  bluetooth.println(currentTurn);
+  // append currentTurn to route
+  // check for SUL and change it to R
+  // check for LUL and change it to S
+  // check for LUS and change it to R
+}
 
 
 ////////////////////////////////////////////////////////////////////////
