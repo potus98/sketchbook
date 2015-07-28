@@ -37,6 +37,17 @@
 // increase max speeds
 // remove four way intersection pause
 // implement global #define debugprint bluetooth.print
+//
+// mode switching
+// use button B to change current mode
+//  - maps, solutions, and global variables retained across mode switches
+//  - able to switch modes at any time?
+//  - RGB light indicates current mode and status
+//     - maze solving final run mode has color to indicate in final run mode WITH a solved route (not all Xs)
+//  - new mode starts in pause() state
+//  - write a field diagnostic mode that exercises all components and reports via bluetooth?
+//  - calibrate IR sensors only at power up
+//  - IR calibration mode reachable via button?
 
 ////////////////////////////////////////////////////////////////////////
 // Prepare NXTShield
@@ -123,6 +134,12 @@ char mazePathRHSWIP [10] = {'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'};
 char mazePathSolved [10] = {'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'};
 int mazePathSolvedCursor = 0;
 
+int mode = 0;
+
+const int redPin = 2;     // for use with testRGB2
+const int greenPin = 3;   // for use with testRGB2
+const int bluePin = 4;    // for use with testRGB2
+
 /* deprecated variables probably not going to be used
 float inches = 0;
 int wheelCirc = 8;   // wheel circumference in inches
@@ -168,13 +185,16 @@ void setup()
 // Main loop
 void loop()
 {
-  
-  if (TestRuns == 0){
-    delay(3000);
-    calibrateIRarray();
-    pause();
-  }  
 
+
+testRGB();
+
+/*
+
+  delay(3000);
+  calibrateIRarray();
+  pause();
+  
   //testNXTShield();             // basic test/demo of NXTShield driving two NXT servos
   //testBlueToothSerial();       // basic test/demo of Parallax BlueTooth Module RN-42
   //calibrateIRarray();
@@ -184,20 +204,27 @@ void loop()
   //testNXTEncoders();
   //getDegrees();
   /////mazeSolverModeRHSPruning();    // bot acts like a maze solver using Right Hand Side algorithm with loop pruning
-
-  mazeSolverModeLHSPruning();
-
-  
+  //mazeSolverModeLHSPruning();
   //mazeSolverModeSolved();
 
+  
 
-  // check for test run length
-  TestRuns++;
-  if ( TestRuns > 80000 ){       // Usually 4000 for testing. Change to big number before competition !!!
-    allStop(); 
-    delay(5000);
-    TestRuns = 0;
-  }
+  switch (mode) {
+
+    case 0:
+      calibrateIRarray();
+      break;
+    
+    case 1:
+      lineFollowerMode();
+      break;
+
+    default:
+      pause();
+    
+  } // close switch statement
+
+*/
 
 } // close void loop()
 
@@ -266,21 +293,6 @@ int testIRarray(){
 }  // close testIRarray
 
 ////////////////////////////////////////////////////////////////////////
-int printIRarray(){
-  // print current IR values on a line
-  int i;
-  for (i = 0; i < NUM_SENSORS; i++)
-  {
-    Serial.print(sensorValues[i]);
-    Serial3.print(sensorValues[i]);
-    Serial.print(' ');
-    Serial3.print(' ');
-  }
-  Serial.println(' ');
-  Serial3.println(' ');
-}  // close testIRarray
-
-////////////////////////////////////////////////////////////////////////
 int testBlueToothSerial(){
   Serial.println("Entering testBlueToothSerial function");
   Serial3.println("Entering testBlueToothSerial function");
@@ -288,6 +300,42 @@ int testBlueToothSerial(){
   Serial3.println("TX test: 0123456789");
   delay(2000);
 }  // close testBlueToothSerial
+
+////////////////////////////////////////////////////////////////////////
+int testRGB(){
+
+  // Start off with the LED off.
+  setColourRgb(0,0,0);
+  
+  unsigned int rgbColour[3];
+
+  // Start off with red.
+  rgbColour[0] = 255;
+  rgbColour[1] = 0;
+  rgbColour[2] = 0;  
+
+  // Choose the colours to increment and decrement.
+  for (int decColour = 0; decColour < 3; decColour += 1) {
+    int incColour = decColour == 2 ? 0 : decColour + 1;
+
+    // cross-fade the two colours.
+    for(int i = 0; i < 255; i += 1) {
+      rgbColour[decColour] -= 1;
+      rgbColour[incColour] += 1;
+      
+      setColourRgb(rgbColour[0], rgbColour[1], rgbColour[2]);
+      delay(25);
+    }
+  }
+} // close testRGB function
+
+////////////////////////////////////////////////////////////////////////
+void setColourRgb(unsigned int red, unsigned int green, unsigned int blue){
+  analogWrite(redPin, red);
+  analogWrite(greenPin, green);
+  analogWrite(bluePin, blue);
+}  // close setColourRgb function
+
 
 ////////////////////////////////////////////////////////////////////////
 int calibrateIRarray(){
@@ -326,6 +374,21 @@ int calibrateIRarray(){
     bluetooth.println("Leaving calibrateIRarray function");
 } // close calibrateIRarray function
 
+
+////////////////////////////////////////////////////////////////////////
+int printIRarray(){
+  // print current IR values on a line
+  int i;
+  for (i = 0; i < NUM_SENSORS; i++)
+  {
+    Serial.print(sensorValues[i]);
+    Serial3.print(sensorValues[i]);
+    Serial.print(' ');
+    Serial3.print(' ');
+  }
+  Serial.println(' ');
+  Serial3.println(' ');
+}  // close testIRarray
 
 ////////////////////////////////////////////////////////////////////////
 int pause(){
@@ -1042,6 +1105,13 @@ int checkForSwitchback(){
 int checkForEdge(){
   // check for edge of table
 }
+
+
+
+
+
+
+
 
 
 
