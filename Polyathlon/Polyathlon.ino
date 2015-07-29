@@ -118,14 +118,6 @@ int reconMode = 0;             // maze recon mode 0 = on, 1 = off
 int locx = 0;                  // location on x axis
 int locy = 0;                  // location on y axis
 
-int leftDegreesCumulative = 0;
-int rightDegreesCumulative = 0;
-int leftDegreesPrevious = 0;
-int rightDegreesPrevious = 0;
-int leftDegreesTraveled = 0;
-int rightDegreesTraveled = 0;
-int avgDegreesTraveled = 0;
-
 char mazeSolved [2] = {'R', 'R'};   // hardcoded test solution
 int mazeSolvedCursor = 0;
 
@@ -135,25 +127,6 @@ char mazePathSolved [10] = {'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X'};
 int mazePathSolvedCursor = 0;
 
 int mode = 0;
-
-const int redPin = 2;     // for use with testRGB2
-const int greenPin = 3;   // for use with testRGB2
-const int bluePin = 4;    // for use with testRGB2
-
-/* deprecated variables probably not going to be used
-float inches = 0;
-int wheelCirc = 8;   // wheel circumference in inches
-float legPreviousDegrees = 0;
-float legPreviousInches = 0;
-int nodeLocCurrent[2] = {0, 1};
-int nodeLocPrevious[2] = {0, 1};
-int degreesToRotate = 0;
-char nodeArraySolved [3] [4] = {
-  {'S', 'W', 'S', 'S'},
-  {'S', 'U', 'E', 'S'},
-  {'E', 'E', 'N', 'F'}
-};
-*/
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -185,12 +158,6 @@ void setup()
 // Main loop
 void loop()
 {
-
-
-testRGB();
-
-/*
-
   delay(3000);
   calibrateIRarray();
   pause();
@@ -205,9 +172,7 @@ testRGB();
   //getDegrees();
   /////mazeSolverModeRHSPruning();    // bot acts like a maze solver using Right Hand Side algorithm with loop pruning
   //mazeSolverModeLHSPruning();
-  //mazeSolverModeSolved();
-
-  
+  //mazeSolverModeSolved();  
 
   switch (mode) {
 
@@ -224,9 +189,7 @@ testRGB();
     
   } // close switch statement
 
-*/
-
-} // close void loop()
+} // close void loop
 
 
 
@@ -300,41 +263,6 @@ int testBlueToothSerial(){
   Serial3.println("TX test: 0123456789");
   delay(2000);
 }  // close testBlueToothSerial
-
-////////////////////////////////////////////////////////////////////////
-int testRGB(){
-
-  // Start off with the LED off.
-  setColourRgb(0,0,0);
-  
-  unsigned int rgbColour[3];
-
-  // Start off with red.
-  rgbColour[0] = 255;
-  rgbColour[1] = 0;
-  rgbColour[2] = 0;  
-
-  // Choose the colours to increment and decrement.
-  for (int decColour = 0; decColour < 3; decColour += 1) {
-    int incColour = decColour == 2 ? 0 : decColour + 1;
-
-    // cross-fade the two colours.
-    for(int i = 0; i < 255; i += 1) {
-      rgbColour[decColour] -= 1;
-      rgbColour[incColour] += 1;
-      
-      setColourRgb(rgbColour[0], rgbColour[1], rgbColour[2]);
-      delay(25);
-    }
-  }
-} // close testRGB function
-
-////////////////////////////////////////////////////////////////////////
-void setColourRgb(unsigned int red, unsigned int green, unsigned int blue){
-  analogWrite(redPin, red);
-  analogWrite(greenPin, green);
-  analogWrite(bluePin, blue);
-}  // close setColourRgb function
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -425,55 +353,6 @@ int allStop(){                                  // turn off drive motors
   Motor1.stop();
   Motor2.stop();
 }
-
-////////////////////////////////////////////////////////////////////////
-int getDegrees(){      // TODO rename to getEncoderTics or something more accurate, meaningful
-                        // determine distance from last time this fucntion was called until this time
-                        // 'distance' is currently measured in wheel encoder tics (not inches or cm)
-                        //
-                        // TODO will bot need to track distances on final run? Or just know sequence of valid nodes and run those?
-  bluetooth.println("Entering getDegrees function");
-  allStop();
-  delay(400);
-  leftDegreesCumulative = Motor1.readPosition();                          // obtain encoder reading
-  rightDegreesCumulative = Motor2.readPosition();                         // obtain encoder reading
-  delay(10);                                                              // TODO is this delay necessary to read the positions?
-  leftDegreesTraveled = leftDegreesCumulative - leftDegreesPrevious;    // calculate distance traveled
-  rightDegreesTraveled = rightDegreesCumulative - rightDegreesPrevious;  // calculate distance traveled
-  if (leftDegreesTraveled > 0 && rightDegreesTraveled > 0){
-    avgDegreesTraveled = (leftDegreesTraveled + rightDegreesTraveled) / 2;
-  }
-  if (leftDegreesTraveled == 0 && rightDegreesTraveled == 0){
-    avgDegreesTraveled = 0;
-  }
-
-  /*
-  Serial3.print("Total: ");
-  Serial3.print(leftDegreesCumulative);
-  Serial3.print(" ");
-  Serial3.println(rightDegreesCumulative);
-  Serial3.print("Prev: ");
-  Serial3.print(leftDegreesPrevious);
-  Serial3.print(" ");
-  Serial3.println(rightDegreesPrevious);
-  Serial3.print("This leg: ");
-  Serial3.print(leftDegreesTraveled);
-  Serial3.print(" ");
-  Serial3.println(rightDegreesTraveled);
-  */
-  
-  bluetooth.print("avgDegreesTraveled: ");  // really, it's avg encoder tics accumulated
-  bluetooth.println(avgDegreesTraveled);
-  bluetooth.println(" ");
-    
-  leftDegreesPrevious = leftDegreesCumulative;           // reset starting point for next leg
-  rightDegreesPrevious = rightDegreesCumulative;         // reset starting point for next leg
-  
-  delay(200); // TODO remove debugging delay
-  
-  return avgDegreesTraveled;
-  
-} // close getDegrees function
 
 ////////////////////////////////////////////////////////////////////////
 int lineFollowerMode(){                  // bot acts like a line follower
@@ -1107,14 +986,6 @@ int checkForEdge(){
 }
 
 
-
-
-
-
-
-
-
-
 ////////////////////////////////////////////////////////////////////////
 //
 //  Deprecated functions currently not planning to use
@@ -1122,6 +993,16 @@ int checkForEdge(){
 ////////////////////////////////////////////////////////////////////////
 
 /*
+
+// some variables realted to distance measurement via wheel encoders
+int leftDegreesCumulative = 0;
+int rightDegreesCumulative = 0;
+int leftDegreesPrevious = 0;
+int rightDegreesPrevious = 0;
+int leftDegreesTraveled = 0;
+int rightDegreesTraveled = 0;
+int avgDegreesTraveled = 0;
+
 
 ////////////////////////////////////////////////////////////////////////
 int updateHeading(int pivotType){                      //  TODO probably won's use this approach/function
@@ -1222,6 +1103,39 @@ int pivot(int pivotDegrees, int pivotDirection){
  
 } // close pivotLeft function
 
+////////////////////////////////////////////////////////////////////////
+int getDegrees(){      // TODO rename to getEncoderTics or something more accurate, meaningful
+                        // determine distance from last time this fucntion was called until this time
+                        // 'distance' is currently measured in wheel encoder tics (not inches or cm)
+                        //
+                        // TODO will bot need to track distances on final run? Or just know sequence of valid nodes and run those?
+  bluetooth.println("Entering getDegrees function");
+  allStop();
+  delay(400);
+  leftDegreesCumulative = Motor1.readPosition();                          // obtain encoder reading
+  rightDegreesCumulative = Motor2.readPosition();                         // obtain encoder reading
+  delay(10);                                                              // TODO is this delay necessary to read the positions?
+  leftDegreesTraveled = leftDegreesCumulative - leftDegreesPrevious;    // calculate distance traveled
+  rightDegreesTraveled = rightDegreesCumulative - rightDegreesPrevious;  // calculate distance traveled
+  if (leftDegreesTraveled > 0 && rightDegreesTraveled > 0){
+    avgDegreesTraveled = (leftDegreesTraveled + rightDegreesTraveled) / 2;
+  }
+  if (leftDegreesTraveled == 0 && rightDegreesTraveled == 0){
+    avgDegreesTraveled = 0;
+  }
+  
+  bluetooth.print("avgDegreesTraveled: ");  // really, it's avg encoder tics accumulated
+  bluetooth.println(avgDegreesTraveled);
+  bluetooth.println(" ");
+    
+  leftDegreesPrevious = leftDegreesCumulative;           // reset starting point for next leg
+  rightDegreesPrevious = rightDegreesCumulative;         // reset starting point for next leg
+  
+  delay(200); // TODO remove debugging delay
+  
+  return avgDegreesTraveled;
+  
+} // close getDegrees function
 
 */
 
